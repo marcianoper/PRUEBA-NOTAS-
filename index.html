@@ -168,7 +168,6 @@
     </div>
 
     <div id="vistaMensaje" class="msgbox" style="display:none;"></div>
-
     <div id="resultado-totales"></div>
 
     <!-- Panel de errores para tablet -->
@@ -266,45 +265,18 @@
       out.textContent = doc;
     }
 
-    // ========= IMPRESIÓN (más estable en iPad) =========
-    function printHtml(html){
-      // Intento 1: iframe (mejor para Safari)
-      try{
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-
-        const doc = iframe.contentWindow.document;
-        doc.open();
-        doc.write(html);
-        doc.close();
-
-        setTimeout(() => {
-          try{
-            iframe.contentWindow.focus();
-            iframe.contentWindow.print();
-          } finally {
-            setTimeout(() => document.body.removeChild(iframe), 800);
-          }
-        }, 350);
-
+    // ========= IMPRESIÓN: MISMO MÉTODO QUE TU EJEMPLO (window.open) =========
+    function printHtmlWindow(html){
+      const win = window.open('', '_blank', 'width=420,height=650');
+      if (!win) {
+        alert("No se pudo abrir la ventana de impresión. Activa ventanas emergentes (popups) en tu navegador.");
         return;
-      }catch(e){
-        // Intento 2: ventana nueva
       }
-
-      const win = window.open('', '_blank');
-      if (!win) { alert("Tu tablet bloqueó la impresión (popups). Activa 'permitir ventanas emergentes'."); return; }
       win.document.open();
       win.document.write(html);
       win.document.close();
       win.focus();
-      setTimeout(() => win.print(), 350);
+      setTimeout(() => win.print(), 300);
     }
 
     function imprimirSebo80mm() {
@@ -337,7 +309,7 @@
         </div>
       </body></html>`;
 
-      printHtml(html);
+      printHtmlWindow(html);
     }
 
     function imprimirEtiqueta80mm() {
@@ -350,7 +322,7 @@
 
       const safe = escapeHtml(texto).replaceAll('\n','<br>');
 
-      const baseHtml = (body) => `<!DOCTYPE html><html><head><meta charset="utf-8">
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <style>
         body{margin:0;font-family:ui-monospace,Menlo,Consolas,monospace}
@@ -359,24 +331,35 @@
         .line{border-top:1px dashed #000;margin:6px 0}
         .body{text-align:center;font-weight:900;font-size:18px;line-height:1.15;word-break:break-word}
         @media print{@page{size:80mm auto;margin:0}}
-      </style></head><body>${body}</body></html>`;
+      </style></head><body>
+        <div id="t">
+          <div class="c"><b>${STORE}</b><br>FECHA: ${fecha}</div>
+          <div class="line"></div>
+          <div class="body">${safe}</div>
+          <div class="line"></div>
+          <div class="c">Etiqueta / Señalamiento</div>
+        </div>
+      </body></html>`;
 
+      const win = window.open('', '_blank', 'width=420,height=650');
+      if (!win) {
+        alert("No se pudo abrir la ventana de impresión. Activa ventanas emergentes (popups).");
+        return;
+      }
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+      win.focus();
+
+      // MISMA LÓGICA DE TU EJEMPLO: imprimir varias copias en la MISMA ventana
       let i = 0;
-      const doOne = () => {
-        const html = baseHtml(`
-          <div id="t">
-            <div class="c"><b>${STORE}</b><br>FECHA: ${fecha}</div>
-            <div class="line"></div>
-            <div class="body">${safe}</div>
-            <div class="line"></div>
-            <div class="c">Etiqueta / Señalamiento (${i+1}/${copias})</div>
-          </div>
-        `);
-        printHtml(html);
+      const doPrint = () => {
+        win.focus();
+        win.print();
         i++;
-        if (i < copias) setTimeout(doOne, 900);
+        if (i < copias) setTimeout(doPrint, 450);
       };
-      doOne();
+      setTimeout(doPrint, 300);
     }
 
     function limpiarEtiqueta(){
@@ -525,4 +508,5 @@
   </script>
 </body>
 </html>
+
 
