@@ -47,6 +47,19 @@
       padding:14px; border-radius:12px; border:1px solid #111827;
       font-family: ui-monospace, Menlo, Consolas, monospace;
     }
+
+    /* ===== NUEVO: barra borrador ===== */
+    .draftbar{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+      margin: 8px 0 18px;
+      padding:10px 12px;
+      border:1px solid #e5e7eb;
+      border-radius:12px;
+      background:#f9fafb;
+    }
+    .draftbar .status{
+      font-size:12px; color:#6b7280; font-weight:700;
+    }
   </style>
 </head>
 
@@ -70,6 +83,13 @@
 
   <div class="container">
     <h1>Hoja de pesos y sebo</h1>
+
+    <!-- ===== NUEVO: borrador ===== -->
+    <div class="draftbar">
+      <button class="btn-gray" type="button" onclick="vdcDraftSave()">💾 Guardar borrador</button>
+      <button class="btn-red" type="button" onclick="vdcDraftClear()">🧹 Limpiar borrador</button>
+      <span id="draftStatus" class="status">Borrador: —</span>
+    </div>
 
     <label for="fecha">Fecha del viaje:</label>
     <input type="date" id="fecha" />
@@ -234,6 +254,126 @@
       return new Date().toLocaleDateString('es-MX');
     }
 
+    // ========= MENSAJES DE PESAJES (KG Y PZAS OPCIONALES) =========
+    let pesajes = []; // {producto, kg|null, pzas|null}
+
+    // ========= BORRADOR LOCAL (GUARDA TODO) =========
+    function todayISO(){
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2,'0');
+      const day = String(d.getDate()).padStart(2,'0');
+      return `${y}-${m}-${day}`;
+    }
+    const DRAFT_KEY = () => `vdc360:draft:peso_sebo:${todayISO()}`;
+
+    function setDraftStatus(text){
+      const el = document.getElementById('draftStatus');
+      if(el) el.textContent = text;
+    }
+
+    function collectDraft(){
+      return {
+        ts: Date.now(),
+        fields: {
+          fecha: document.getElementById('fecha')?.value || '',
+          seboKg: document.getElementById('seboKg')?.value || '',
+          etiquetaTexto: document.getElementById('etiquetaTexto')?.value || '',
+          etqCopias: document.getElementById('etqCopias')?.value || '1',
+          origen: document.getElementById('origen')?.value || '',
+          whatsNumero: document.getElementById('whatsNumero')?.value || '',
+          prodNombre: document.getElementById('prodNombre')?.value || '',
+          prodKg: document.getElementById('prodKg')?.value || '',
+          prodPzas: document.getElementById('prodPzas')?.value || ''
+        },
+        pesajes: pesajes
+      };
+    }
+
+    function applyDraft(d){
+      if(!d) return;
+      const f = d.fields || {};
+
+      const setVal = (id, v) => {
+        const el = document.getElementById(id);
+        if(el && v != null) el.value = v;
+      };
+
+      setVal('fecha', f.fecha);
+      setVal('seboKg', f.seboKg);
+      setVal('etiquetaTexto', f.etiquetaTexto);
+      setVal('etqCopias', f.etqCopias);
+      setVal('origen', f.origen);
+      setVal('whatsNumero', f.whatsNumero);
+      setVal('prodNombre', f.prodNombre);
+      setVal('prodKg', f.prodKg);
+      setVal('prodPzas', f.prodPzas);
+
+      if(Array.isArray(d.pesajes)){
+        pesajes = d.pesajes;
+        renderTabla();
+      }
+
+      if(document.getElementById('vistaMensaje')?.style?.display === 'block'){
+        // si estaba visible, se conserva (opcional)
+      }
+    }
+
+    function vdcDraftSave(){
+      const d = collectDraft();
+      localStorage.setItem(DRAFT_KEY(), JSON.stringify(d));
+      const hh = new Date(d.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      setDraftStatus(`Borrador guardado ✅ (${hh})`);
+    }
+
+    function vdcDraftLoad(){
+      const raw = localStorage.getItem(DRAFT_KEY());
+      if(!raw){ setDraftStatus('Borrador: —'); return; }
+      try{
+        const d = JSON.parse(raw);
+        applyDraft(d);
+        const hh = new Date(d.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        setDraftStatus(`Borrador cargado ✅ (${hh})`);
+      }catch(e){
+        setDraftStatus('Borrador dañado ⚠️');
+      }
+    }
+
+    function vdcDraftClear(){
+      if(!confirm("¿Seguro que quieres borrar el borrador de HOY?")) return;
+      localStorage.removeItem(DRAFT_KEY());
+      // limpiar UI
+      document.getElementById('fecha').value = '';
+      document.getElementById('seboKg').value = '';
+      document.getElementById('etiquetaTexto').value = '';
+      document.getElementById('etqCopias').value = 1;
+
+      limpiarPesajes(); // ya limpia tabla e inputs
+      document.getElementById('resultado-totales').textContent = '';
+      setDraftStatus('Borrador limpiado 🧹');
+      // crea uno limpio
+      vdcDraftSave();
+    }
+
+    // Autosave (debounce)
+    let tDraft=null;
+    function scheduleDraft(){
+      clearTimeout(tDraft);
+      tDraft=setTimeout(vdcDraftSave, 250);
+    }
+
+    document.addEventListener('input', (e)=>{
+      if(e.target && e.target.matches('input,textarea,select')) scheduleDraft();
+    });
+    document.addEventListener('change', (e)=>{
+      if(e.target && e.target.matches('input,textarea,select')) scheduleDraft();
+    });
+
+    window.vdcDraftSave = vdcDraftSave;
+    window.vdcDraftLoad = vdcDraftLoad;
+    window.vdcDraftClear = vdcDraftClear;
+
+    // ========= VIAJE / TOTALES (igual) =========
     async function guardarViaje() {
       if (!sb) return alert("Supabase no está listo (revisa panel de errores).");
 
@@ -249,6 +389,8 @@
       const { error } = await sb.from('hoja_viaje').insert([{ fecha, resultados: datos }]);
       if (error) return alert("❌ Error al guardar viaje: " + error.message);
       alert("✅ Viaje guardado correctamente.");
+
+      vdcDraftSave();
     }
 
     async function generarDocumento() {
@@ -280,9 +422,11 @@
         doc += `🟢 ${prod} → ${d.kg.toFixed(2)} kg | ${d.pzas} piezas\n`;
       });
       out.textContent = doc;
+
+      vdcDraftSave();
     }
 
-    // ========= IMPRESIÓN: MISMO MÉTODO QUE TU EJEMPLO (window.open) =========
+    // ========= IMPRESIÓN =========
     function printHtmlWindow(html){
       const win = window.open('', '_blank', 'width=420,height=650');
       if (!win) {
@@ -327,6 +471,7 @@
       </body></html>`;
 
       printHtmlWindow(html);
+      vdcDraftSave();
     }
 
     function imprimirEtiqueta80mm() {
@@ -368,7 +513,6 @@
       win.document.close();
       win.focus();
 
-      // MISMA LÓGICA DE TU EJEMPLO: imprimir varias copias en la MISMA ventana
       let i = 0;
       const doPrint = () => {
         win.focus();
@@ -377,16 +521,17 @@
         if (i < copias) setTimeout(doPrint, 450);
       };
       setTimeout(doPrint, 300);
+
+      vdcDraftSave();
     }
 
     function limpiarEtiqueta(){
       document.getElementById('etiquetaTexto').value = '';
       document.getElementById('etqCopias').value = 1;
+      scheduleDraft();
     }
 
-    // ========= MENSAJES DE PESAJES (KG Y PZAS OPCIONALES) =========
-    let pesajes = []; // {producto, kg|null, pzas|null}
-
+    // ========= PESAJES =========
     function agregarLinea(){
       const producto = (document.getElementById('prodNombre').value || '').trim();
 
@@ -412,11 +557,13 @@
       document.getElementById('prodKg').value = '';
       document.getElementById('prodPzas').value = '';
       renderTabla();
+      vdcDraftSave();
     }
 
     function eliminarLinea(idx){
       pesajes.splice(idx, 1);
       renderTabla();
+      vdcDraftSave();
     }
 
     function renderTabla(){
@@ -458,6 +605,7 @@
       box.style.display = 'block';
       box.textContent = msg;
 
+      vdcDraftSave();
       return msg;
     }
 
@@ -486,6 +634,7 @@
         : `https://wa.me/?text=${encoded}`;
 
       window.open(url, '_blank');
+      vdcDraftSave();
     }
 
     function limpiarPesajes(){
@@ -498,6 +647,7 @@
       document.getElementById('vistaMensaje').style.display = 'none';
       document.getElementById('vistaMensaje').textContent = '';
       renderTabla();
+      vdcDraftSave();
     }
 
     function escapeHtml(s){
@@ -522,8 +672,16 @@
     window.copiarMensaje = copiarMensaje;
     window.abrirWhatsApp = abrirWhatsApp;
     window.limpiarPesajes = limpiarPesajes;
+
+    // ========= ARRANQUE: cargar borrador =========
+    window.addEventListener('DOMContentLoaded', () => {
+      // fecha por defecto (si no hay borrador)
+      const f = document.getElementById('fecha');
+      if(f && !f.value) f.value = todayISO();
+
+      vdcDraftLoad();
+      vdcDraftSave(); // crea/actualiza key del día
+    });
   </script>
 </body>
 </html>
-
-
