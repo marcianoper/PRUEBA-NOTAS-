@@ -743,9 +743,9 @@
 
   <script>
     const SUPABASE_URL = "https://lujroedkbgffobyblbie.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1anJvZWRrYmdmZm9ieWJsYmllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODkzNDgsImV4cCI6MjA3MDc2NTM0OH0.bSbBZeS59aPSEGPj1YGcmZCyQTfgf3fz9pNDuR2ID7c";
+    const SUPABASE_ANON_KEY = "TU_SUPABASE_ANON_KEY_AQUI";
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const $ = (id) => document.getElementById(id);
 
@@ -825,7 +825,7 @@
             <td>${it.desc || 'Sin descripción'}</td>
             <td class="num">${fmtNum(it.kg)}</td>
             <td class="num">${fmtNum(it.pzs,0)}</td>
-            <td><button class="btn-danger" onclick="eliminarOrigen(${idx})">Eliminar</button></td>
+            <td><button class="btn-danger" type="button" onclick="eliminarOrigen(${idx})">Eliminar</button></td>
           </tr>
         `).join('');
       }
@@ -844,7 +844,7 @@
             <td>${it.desc || 'Sin descripción'}</td>
             <td class="num">${fmtNum(it.kg)}</td>
             <td class="num">${fmtNum(it.pzs,0)}</td>
-            <td><button class="btn-danger" onclick="eliminarProcesado(${idx})">Eliminar</button></td>
+            <td><button class="btn-danger" type="button" onclick="eliminarProcesado(${idx})">Eliminar</button></td>
           </tr>
         `).join('');
       }
@@ -899,8 +899,8 @@
         costo_merma: costoMerma,
         porcentaje_merma: porcentajeMerma,
         precio_final_limpio_kg: precioFinalLimpio,
-        origen_detalle: state.origen,
-        procesado_detalle: state.procesado,
+        origen_detalle: [...state.origen],
+        procesado_detalle: [...state.procesado],
         observaciones: $('observaciones').value.trim()
       };
     }
@@ -934,7 +934,7 @@
 
     async function probarConexion(){
       try{
-        const { error } = await supabase.from('procesos_limpieza').select('id').limit(1);
+        const { error } = await sb.from('procesos_limpieza').select('id').limit(1);
         if(error) throw error;
         setConexion(true, 'Supabase conectado');
       }catch(err){
@@ -970,14 +970,14 @@
         let res;
 
         if(state.editId){
-          res = await supabase
+          res = await sb
             .from('procesos_limpieza')
             .update(data)
             .eq('id', state.editId)
             .select()
             .single();
         } else {
-          res = await supabase
+          res = await sb
             .from('procesos_limpieza')
             .insert(data)
             .select()
@@ -997,7 +997,7 @@
 
     async function cargarHistorial(){
       try{
-        const { data, error } = await supabase
+        const { data, error } = await sb
           .from('procesos_limpieza')
           .select('*')
           .order('fecha', { ascending:false })
@@ -1022,7 +1022,7 @@
       }
 
       try{
-        const { data, error } = await supabase
+        const { data, error } = await sb
           .from('procesos_limpieza')
           .select('*')
           .eq('fecha', fecha)
@@ -1060,14 +1060,14 @@
           <td class="num">${fmtNum(row.kg_procesado)}</td>
           <td class="num">${fmtNum(row.porcentaje_merma)}%</td>
           <td class="num">${fmtMoney(row.precio_final_limpio_kg)}</td>
-          <td><button class="btn-soft" onclick="cargarRegistro(${row.id})">Abrir</button></td>
+          <td><button class="btn-soft" type="button" onclick="cargarRegistro(${row.id})">Abrir</button></td>
         </tr>
       `).join('');
     }
 
     window.cargarRegistro = async function(id){
       try{
-        const { data, error } = await supabase
+        const { data, error } = await sb
           .from('procesos_limpieza')
           .select('*')
           .eq('id', id)
