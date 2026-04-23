@@ -454,7 +454,7 @@
       <div class="card-head">
         <div>
           <h2>Configuración y datos del lote</h2>
-          <p>Captura el producto y observaciones del proceso. El precio se toma automáticamente desde la otra página.</p>
+          <p>Captura el producto y observaciones del proceso. El precio se toma automáticamente de costo_finales_por_producto.</p>
         </div>
         <div class="pill" id="pillConexion">Conectando...</div>
       </div>
@@ -759,17 +759,17 @@
   </main>
 
   <script>
-    // Supabase de esta página (limpieza) - se mantiene igual para guardar procesos
+    // Supabase de limpieza: se mantiene para guardar y leer procesos_limpieza
     const SUPABASE_URL = "https://lujroedkbgffobyblbie.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1anJvZWRrYmdmZm9ieWJsYmllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODkzNDgsImV4cCI6MjA3MDc2NTM0OH0.bSbBZeS59aPSEGPj1YGcmZCyQTfgf3fz9pNDuR2ID7c";
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Supabase de la otra página (costos) - solo lectura del precio
+    // Supabase / tabla de costos: lectura automática del precio
     const SUPABASE_COSTOS_URL = "https://lujroedkbgffobyblbie.supabase.co";
     const SUPABASE_COSTOS_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1anJvZWRrYmdmZm9ieWJsYmllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODkzNDgsImV4cCI6MjA3MDc2NTM0OH0.bSbBZeS59aPSEGPj1YGcmZCyQTfgf3fz9pNDuR2ID7c";
     const sbCostos = window.supabase.createClient(SUPABASE_COSTOS_URL, SUPABASE_COSTOS_ANON_KEY);
 
-    const COSTOS_FINALES_TABLE = 'costos_finales_por_producto';
+    const COSTOS_FINALES_TABLE = 'costo_finales_por_producto';
 
     const $ = (id) => document.getElementById(id);
 
@@ -854,9 +854,10 @@
       try{
         const { data, error } = await sbCostos
           .from(COSTOS_FINALES_TABLE)
-          .select('fecha, producto, costo_final, costo_final_limpio_kg, precio_final, costo_final_por_kg')
+          .select('fecha, producto, costo_final')
           .eq('fecha', fecha)
           .eq('producto', productoBase)
+          .order('updated_at', { ascending: false })
           .limit(1);
 
         if(error) throw error;
@@ -870,8 +871,7 @@
           return;
         }
 
-        const precio =
-          Number(row.costo_final ?? row.costo_final_limpio_kg ?? row.precio_final ?? row.costo_final_por_kg ?? 0);
+        const precio = Number(row.costo_final || 0);
 
         $('precioSucio').value = precio > 0 ? String(precio) : '';
         setPrecioStatus('ok', `Precio cargado de ${productoBase} (${fecha})`);
@@ -1183,11 +1183,9 @@
         updateProductLabels();
         renderOrigen();
         renderProcesado();
-
-        // El precio se vuelve a cargar automático con la fecha/producto actual
         await cargarPrecioAutomatico();
-
         calcularResumen();
+
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }catch(err){
         console.error(err);
