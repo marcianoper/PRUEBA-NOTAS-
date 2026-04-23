@@ -188,6 +188,12 @@
       resize:vertical;
     }
 
+    .readonly-input{
+      background:#f8fafc !important;
+      color:var(--ink);
+      font-weight:800;
+    }
+
     .btns{
       display:flex;
       gap:10px;
@@ -328,6 +334,12 @@
       border-color:#f6ddb6;
     }
 
+    .pill.danger{
+      background:#fff1f2;
+      color:var(--danger);
+      border-color:#fecdd3;
+    }
+
     .kpis{
       display:grid;
       grid-template-columns: repeat(2, 1fr);
@@ -442,7 +454,7 @@
       <div class="card-head">
         <div>
           <h2>Configuración y datos del lote</h2>
-          <p>Captura el producto, costo y observaciones del proceso.</p>
+          <p>Captura el producto y observaciones del proceso. El precio se toma automáticamente desde la otra página.</p>
         </div>
         <div class="pill" id="pillConexion">Conectando...</div>
       </div>
@@ -469,13 +481,18 @@
 
           <div class="field">
             <label for="precioSucio">Precio por kg del producto sucio</label>
-            <input type="number" id="precioSucio" min="0" step="0.0001" placeholder="Ej. 34.44" />
+            <input class="readonly-input" type="text" id="precioSucio" readonly />
           </div>
 
           <div class="field">
             <label for="buscarFecha">Consultar fecha</label>
             <input type="date" id="buscarFecha" />
           </div>
+        </div>
+
+        <div class="statusbar" style="margin-bottom:12px">
+          <span class="pill" id="pillPrecioFuente">Esperando cargar precio...</span>
+          <span class="pill warn" id="pillPrecioProducto">Producto base: —</span>
         </div>
 
         <div class="field">
@@ -742,10 +759,17 @@
   </main>
 
   <script>
+    // Supabase de esta página (limpieza) - se mantiene igual para guardar procesos
     const SUPABASE_URL = "https://lujroedkbgffobyblbie.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1anJvZWRrYmdmZm9ieWJsYmllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODkzNDgsImV4cCI6MjA3MDc2NTM0OH0.bSbBZeS59aPSEGPj1YGcmZCyQTfgf3fz9pNDuR2ID7c";
-
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Supabase de la otra página (costos) - solo lectura del precio
+    const SUPABASE_COSTOS_URL = "https://lujroedkbgffobyblbie.supabase.co";
+    const SUPABASE_COSTOS_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1anJvZWRrYmdmZm9ieWJsYmllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODkzNDgsImV4cCI6MjA3MDc2NTM0OH0.bSbBZeS59aPSEGPj1YGcmZCyQTfgf3fz9pNDuR2ID7c";
+    const sbCostos = window.supabase.createClient(SUPABASE_COSTOS_URL, SUPABASE_COSTOS_ANON_KEY);
+
+    const COSTOS_FINALES_TABLE = 'costos_finales_por_producto';
 
     const $ = (id) => document.getElementById(id);
 
@@ -793,11 +817,71 @@
       el.className = ok ? 'pill ok' : 'pill warn';
     }
 
+    function setPrecioStatus(kind, txt){
+      const el = $('pillPrecioFuente');
+      el.textContent = txt;
+      el.className = `pill ${kind || ''}`.trim();
+    }
+
     function getLabels(producto){
       if(producto === 'Menudo') return { origen:'Menudo sucio', procesado:'Menudo limpio' };
       if(producto === 'Libro') return { origen:'Libro sucio', procesado:'Libro limpio' };
       if(producto === 'Pata') return { origen:'Pata sucia', procesado:'Pata limpia' };
       return { origen:'Producto sucio', procesado:'Producto limpio' };
+    }
+
+    function getCostoBaseProducto(producto){
+      if(producto === 'Menudo') return 'Panza';
+      if(producto === 'Libro') return 'Libro';
+      if(producto === 'Pata') return 'Pata';
+      return '';
+    }
+
+    async function cargarPrecioAutomatico(){
+      const fecha = $('fecha').value;
+      const producto = $('producto').value;
+      const productoBase = getCostoBaseProducto(producto);
+
+      $('pillPrecioProducto').textContent = `Producto base: ${productoBase || '—'}`;
+
+      if(!fecha || !productoBase){
+        $('precioSucio').value = '';
+        setPrecioStatus('warn', 'Falta fecha o producto');
+        calcularResumen();
+        return;
+      }
+
+      try{
+        const { data, error } = await sbCostos
+          .from(COSTOS_FINALES_TABLE)
+          .select('fecha, producto, costo_final, costo_final_limpio_kg, precio_final, costo_final_por_kg')
+          .eq('fecha', fecha)
+          .eq('producto', productoBase)
+          .limit(1);
+
+        if(error) throw error;
+
+        const row = Array.isArray(data) && data.length ? data[0] : null;
+
+        if(!row){
+          $('precioSucio').value = '';
+          setPrecioStatus('danger', `No hay precio para ${productoBase} en ${fecha}`);
+          calcularResumen();
+          return;
+        }
+
+        const precio =
+          Number(row.costo_final ?? row.costo_final_limpio_kg ?? row.precio_final ?? row.costo_final_por_kg ?? 0);
+
+        $('precioSucio').value = precio > 0 ? String(precio) : '';
+        setPrecioStatus('ok', `Precio cargado de ${productoBase} (${fecha})`);
+        calcularResumen();
+      }catch(err){
+        console.error(err);
+        $('precioSucio').value = '';
+        setPrecioStatus('danger', 'Error al cargar el precio automático');
+        calcularResumen();
+      }
     }
 
     function updateProductLabels(){
@@ -930,12 +1014,19 @@
       renderOrigen();
       renderProcesado();
       calcularResumen();
+      cargarPrecioAutomatico();
     }
 
     async function probarConexion(){
       try{
-        const { error } = await sb.from('procesos_limpieza').select('id').limit(1);
-        if(error) throw error;
+        const [{ error: errorLimpieza }, { error: errorCostos }] = await Promise.all([
+          sb.from('procesos_limpieza').select('id').limit(1),
+          sbCostos.from(COSTOS_FINALES_TABLE).select('fecha').limit(1)
+        ]);
+
+        if(errorLimpieza) throw errorLimpieza;
+        if(errorCostos) throw errorCostos;
+
         setConexion(true, 'Supabase conectado');
       }catch(err){
         console.error(err);
@@ -953,6 +1044,11 @@
 
       if(!data.producto){
         alert('Selecciona un producto.');
+        return;
+      }
+
+      if(data.precio_sucio_kg <= 0){
+        alert('No hay precio automático cargado para este producto y fecha.');
         return;
       }
 
@@ -1079,7 +1175,6 @@
         $('fecha').value = data.fecha || '';
         $('folio').value = data.folio || '';
         $('producto').value = data.producto || 'Menudo';
-        $('precioSucio').value = data.precio_sucio_kg ?? '';
         $('observaciones').value = data.observaciones || '';
 
         state.origen = Array.isArray(data.origen_detalle) ? data.origen_detalle : [];
@@ -1088,8 +1183,11 @@
         updateProductLabels();
         renderOrigen();
         renderProcesado();
-        calcularResumen();
 
+        // El precio se vuelve a cargar automático con la fecha/producto actual
+        await cargarPrecioAutomatico();
+
+        calcularResumen();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }catch(err){
         console.error(err);
@@ -1156,10 +1254,17 @@
     $('btnBuscarFecha').addEventListener('click', buscarPorFecha);
     $('btnCargarHoy').addEventListener('click', cargarHoy);
 
-    $('producto').addEventListener('change', updateProductLabels);
-    $('fecha').addEventListener('input', calcularResumen);
+    $('producto').addEventListener('change', async () => {
+      updateProductLabels();
+      await cargarPrecioAutomatico();
+    });
+
+    $('fecha').addEventListener('input', async () => {
+      calcularResumen();
+      await cargarPrecioAutomatico();
+    });
+
     $('folio').addEventListener('input', calcularResumen);
-    $('precioSucio').addEventListener('input', calcularResumen);
     $('observaciones').addEventListener('input', calcularResumen);
 
     ['kgOrigen','pzsOrigen'].forEach(id => {
@@ -1182,6 +1287,7 @@
       renderProcesado();
       calcularResumen();
       await probarConexion();
+      await cargarPrecioAutomatico();
       await cargarHistorial();
     });
   </script>
