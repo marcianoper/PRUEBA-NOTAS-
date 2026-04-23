@@ -194,12 +194,6 @@
       font-weight:800;
     }
 
-    .btns{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-
     button{
       border:none;
       cursor:pointer;
@@ -454,7 +448,7 @@
       <div class="card-head">
         <div>
           <h2>Configuración y datos del lote</h2>
-          <p>Captura el producto y observaciones del proceso. El precio se toma automáticamente de costo_finales_por_producto.</p>
+          <p>Captura el producto y observaciones del proceso. El precio se toma automáticamente del viaje aplicable.</p>
         </div>
         <div class="pill" id="pillConexion">Conectando...</div>
       </div>
@@ -492,7 +486,7 @@
 
         <div class="statusbar" style="margin-bottom:12px">
           <span class="pill" id="pillPrecioFuente">Esperando cargar precio...</span>
-          <span class="pill warn" id="pillPrecioProducto">Producto base: —</span>
+          <span class="pill warn" id="pillPrecioProducto">Base: — | Viaje aplicado: —</span>
         </div>
 
         <div class="field">
@@ -759,15 +753,22 @@
   </main>
 
   <script>
-    // Supabase de limpieza: se mantiene para guardar y leer procesos_limpieza
     const SUPABASE_URL = "https://lujroedkbgffobyblbie.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1anJvZWRrYmdmZm9ieWJsYmllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODkzNDgsImV4cCI6MjA3MDc2NTM0OH0.bSbBZeS59aPSEGPj1YGcmZCyQTfgf3fz9pNDuR2ID7c";
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Supabase / tabla de costos: lectura automática del precio
     const SUPABASE_COSTOS_URL = "https://lujroedkbgffobyblbie.supabase.co";
     const SUPABASE_COSTOS_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1anJvZWRrYmdmZm9ieWJsYmllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODkzNDgsImV4cCI6MjA3MDc2NTM0OH0.bSbBZeS59aPSEGPj1YGcmZCyQTfgf3fz9pNDuR2ID7c";
-    const sbCostos = window.supabase.createClient(SUPABASE_COSTOS_URL, SUPABASE_COSTOS_ANON_KEY);
+    const sbCostos = window.supabase.createClient(
+      SUPABASE_COSTOS_URL,
+      SUPABASE_COSTOS_ANON_KEY,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false
+        }
+      }
+    );
 
     const COSTOS_FINALES_TABLE = 'costos_finales_por_producto';
 
@@ -837,12 +838,55 @@
       return '';
     }
 
+    function toLocalDateParts(dateStr){
+      const [y, m, d] = String(dateStr).split('-').map(Number);
+      return new Date(y, (m || 1) - 1, d || 1);
+    }
+
+    function formatDateLocal(date){
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function addDays(date, days){
+      const copy = new Date(date);
+      copy.setDate(copy.getDate() + days);
+      return copy;
+    }
+
+    function getFechaViajeAplicable(fechaSeleccionada){
+      const date = toLocalDateParts(fechaSeleccionada);
+      const day = date.getDay();
+
+      let viajeDate;
+
+      if(day === 1){
+        viajeDate = addDays(date, -3);   // lunes -> viernes anterior
+      } else if(day === 2){
+        viajeDate = addDays(date, -4);   // martes -> viernes anterior
+      } else if(day === 3){
+        viajeDate = addDays(date, -1);   // miércoles -> martes
+      } else if(day === 4){
+        viajeDate = addDays(date, -2);   // jueves -> martes
+      } else if(day === 5){
+        viajeDate = addDays(date, -1);   // viernes -> jueves
+      } else if(day === 6){
+        viajeDate = addDays(date, -1);   // sábado -> viernes
+      } else {
+        viajeDate = addDays(date, -2);   // domingo -> viernes
+      }
+
+      return formatDateLocal(viajeDate);
+    }
+
     async function cargarPrecioAutomatico(){
       const fecha = $('fecha').value;
       const producto = $('producto').value;
       const productoBase = getCostoBaseProducto(producto);
 
-      $('pillPrecioProducto').textContent = `Producto base: ${productoBase || '—'}`;
+      $('pillPrecioProducto').textContent = `Base: ${productoBase || '—'} | Viaje aplicado: ${fecha ? getFechaViajeAplicable(fecha) : '—'}`;
 
       if(!fecha || !productoBase){
         $('precioSucio').value = '';
@@ -851,11 +895,13 @@
         return;
       }
 
+      const fechaViajeAplicable = getFechaViajeAplicable(fecha);
+
       try{
         const { data, error } = await sbCostos
           .from(COSTOS_FINALES_TABLE)
           .select('fecha, producto, costo_final')
-          .eq('fecha', fecha)
+          .eq('fecha', fechaViajeAplicable)
           .eq('producto', productoBase)
           .order('updated_at', { ascending: false })
           .limit(1);
@@ -866,7 +912,7 @@
 
         if(!row){
           $('precioSucio').value = '';
-          setPrecioStatus('danger', `No hay precio para ${productoBase} en ${fecha}`);
+          setPrecioStatus('danger', `No hay precio para ${productoBase} del viaje ${fechaViajeAplicable}`);
           calcularResumen();
           return;
         }
@@ -874,7 +920,7 @@
         const precio = Number(row.costo_final || 0);
 
         $('precioSucio').value = precio > 0 ? String(precio) : '';
-        setPrecioStatus('ok', `Precio cargado de ${productoBase} (${fecha})`);
+        setPrecioStatus('ok', `Precio de ${productoBase} tomado del viaje ${fechaViajeAplicable}`);
         calcularResumen();
       }catch(err){
         console.error(err);
