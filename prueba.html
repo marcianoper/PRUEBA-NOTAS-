@@ -765,7 +765,7 @@
           </div>
 
           <div class="section-gap">
-            <div class="pill warn">Tip: si el producto regresa un día después, igual se guarda como parte del mismo proceso del día capturado.</div>
+            <div class="pill warn">Tip: la merma se calcula de manera independiente por Menudo, Libro y Pata.</div>
           </div>
         </div>
       </div>
@@ -791,12 +791,14 @@
     );
 
     const COSTOS_FINALES_TABLE = 'costos_finales_por_producto';
-
     const $ = (id) => document.getElementById(id);
 
     const state = {
-      origen: [],
-      procesado: [],
+      capturas: {
+        Menudo: { origen: [], procesado: [] },
+        Libro: { origen: [], procesado: [] },
+        Pata: { origen: [], procesado: [] }
+      },
       historial: [],
       editId: null
     };
@@ -830,6 +832,18 @@
     function safeNum(v){
       const n = Number(v);
       return Number.isFinite(n) ? n : 0;
+    }
+
+    function productoActual(){
+      return $('producto').value;
+    }
+
+    function origenActual(){
+      return state.capturas[productoActual()].origen;
+    }
+
+    function procesadoActual(){
+      return state.capturas[productoActual()].procesado;
     }
 
     function setConexion(ok, txt){
@@ -879,7 +893,6 @@
     function getFechaViajeAplicable(fechaSeleccionada){
       const date = toLocalDateParts(fechaSeleccionada);
       const day = date.getDay();
-
       let viajeDate;
 
       if(day === 1){
@@ -903,7 +916,7 @@
 
     async function cargarPrecioAutomatico(){
       const fecha = $('fecha').value;
-      const producto = $('producto').value;
+      const producto = productoActual();
       const productoBase = getCostoBaseProducto(producto);
 
       $('pillPrecioProducto').textContent = `Base: ${productoBase || '—'} | Viaje aplicado: ${fecha ? getFechaViajeAplicable(fecha) : '—'}`;
@@ -938,7 +951,6 @@
         }
 
         const precio = Number(row.costo_final || 0);
-
         $('precioSucio').value = precio > 0 ? String(precio) : '';
         setPrecioStatus('ok', `Precio de ${productoBase} tomado del viaje ${fechaViajeAplicable}`);
         calcularResumen();
@@ -950,10 +962,18 @@
       }
     }
 
+    function totalKg(arr){
+      return arr.reduce((acc, it) => acc + safeNum(it.kg), 0);
+    }
+
+    function totalPzs(arr){
+      return arr.reduce((acc, it) => acc + safeNum(it.pzs), 0);
+    }
+
     function actualizarEstadoCaptura(){
-      const producto = $('producto').value;
-      const origenCount = state.origen.length;
-      const procesadoCount = state.procesado.length;
+      const producto = productoActual();
+      const origenCount = state.capturas[producto].origen.length;
+      const procesadoCount = state.capturas[producto].procesado.length;
 
       $('pillProductoActual').textContent = `Producto actual: ${producto}`;
       $('pillOrigenCount').textContent = `Origen capturado: ${origenCount} tanda${origenCount === 1 ? '' : 's'}`;
@@ -975,30 +995,28 @@
     }
 
     function updateProductLabels(){
-      const producto = $('producto').value;
+      const producto = productoActual();
       const labels = getLabels(producto);
+
       $('labelOrigen').textContent = labels.origen;
       $('labelProcesado').textContent = labels.procesado;
       $('productoOrigenView').value = producto;
       $('productoProcesadoView').value = producto;
+
+      renderOrigen();
+      renderProcesado();
       actualizarEstadoCaptura();
       calcularResumen();
     }
 
-    function totalKg(arr){
-      return arr.reduce((acc, it) => acc + safeNum(it.kg), 0);
-    }
-
-    function totalPzs(arr){
-      return arr.reduce((acc, it) => acc + safeNum(it.pzs), 0);
-    }
-
     function renderOrigen(){
       const tbody = $('tbodyOrigen');
-      if(!state.origen.length){
+      const arr = origenActual();
+
+      if(!arr.length){
         tbody.innerHTML = `<tr><td colspan="5" class="empty">Aún no hay capturas de origen.</td></tr>`;
       } else {
-        tbody.innerHTML = state.origen.map((it, idx) => `
+        tbody.innerHTML = arr.map((it, idx) => `
           <tr>
             <td>${it.producto || '-'}</td>
             <td>${it.desc || 'Sin origen'}</td>
@@ -1009,17 +1027,19 @@
         `).join('');
       }
 
-      $('totalKgOrigen').textContent = fmtNum(totalKg(state.origen));
-      $('totalPzsOrigen').textContent = fmtNum(totalPzs(state.origen),0);
+      $('totalKgOrigen').textContent = fmtNum(totalKg(arr));
+      $('totalPzsOrigen').textContent = fmtNum(totalPzs(arr),0);
       actualizarEstadoCaptura();
     }
 
     function renderProcesado(){
       const tbody = $('tbodyProcesado');
-      if(!state.procesado.length){
+      const arr = procesadoActual();
+
+      if(!arr.length){
         tbody.innerHTML = `<tr><td colspan="5" class="empty">Aún no hay capturas procesadas.</td></tr>`;
       } else {
-        tbody.innerHTML = state.procesado.map((it, idx) => `
+        tbody.innerHTML = arr.map((it, idx) => `
           <tr>
             <td>${it.producto || '-'}</td>
             <td>${it.desc || 'Sin origen'}</td>
@@ -1030,20 +1050,23 @@
         `).join('');
       }
 
-      $('totalKgProcesado').textContent = fmtNum(totalKg(state.procesado));
-      $('totalPzsProcesado').textContent = fmtNum(totalPzs(state.procesado),0);
+      $('totalKgProcesado').textContent = fmtNum(totalKg(arr));
+      $('totalPzsProcesado').textContent = fmtNum(totalPzs(arr),0);
       actualizarEstadoCaptura();
     }
 
     function calcularResumen(){
-      const producto = $('producto').value;
+      const producto = productoActual();
       const fecha = $('fecha').value || null;
       const precioSucio = safeNum($('precioSucio').value);
 
-      const kgOrigen = totalKg(state.origen);
-      const pzsOrigen = totalPzs(state.origen);
-      const kgProcesado = totalKg(state.procesado);
-      const pzsProcesado = totalPzs(state.procesado);
+      const origen = origenActual();
+      const procesado = procesadoActual();
+
+      const kgOrigen = totalKg(origen);
+      const pzsOrigen = totalPzs(origen);
+      const kgProcesado = totalKg(procesado);
+      const pzsProcesado = totalPzs(procesado);
 
       const diferenciaKg = Math.max(kgOrigen - kgProcesado, 0);
       const precioCompra = kgOrigen * precioSucio;
@@ -1078,8 +1101,8 @@
         costo_merma: costoMerma,
         porcentaje_merma: porcentajeMerma,
         precio_final_limpio_kg: precioFinalLimpio,
-        origen_detalle: [...state.origen],
-        procesado_detalle: [...state.procesado],
+        origen_detalle: [...origen],
+        procesado_detalle: [...procesado],
         observaciones: $('observaciones').value.trim()
       };
     }
@@ -1100,13 +1123,18 @@
 
     function nuevoLote(){
       state.editId = null;
-      state.origen = [];
-      state.procesado = [];
+      state.capturas = {
+        Menudo: { origen: [], procesado: [] },
+        Libro: { origen: [], procesado: [] },
+        Pata: { origen: [], procesado: [] }
+      };
+
       $('fecha').value = hoyISO();
       $('precioSucio').value = '';
       $('observaciones').value = '';
       $('descOrigen').value = 'Rastro';
       $('descProcesado').value = 'Rastro';
+
       renderOrigen();
       renderProcesado();
       actualizarEstadoCaptura();
@@ -1272,8 +1300,10 @@
         $('producto').value = data.producto || 'Menudo';
         $('observaciones').value = data.observaciones || '';
 
-        state.origen = Array.isArray(data.origen_detalle) ? data.origen_detalle : [];
-        state.procesado = Array.isArray(data.procesado_detalle) ? data.procesado_detalle : [];
+        state.capturas[data.producto] = {
+          origen: Array.isArray(data.origen_detalle) ? data.origen_detalle : [],
+          procesado: Array.isArray(data.procesado_detalle) ? data.procesado_detalle : []
+        };
 
         updateProductLabels();
         renderOrigen();
@@ -1290,13 +1320,13 @@
     }
 
     window.eliminarOrigen = function(index){
-      state.origen.splice(index, 1);
+      origenActual().splice(index, 1);
       renderOrigen();
       calcularResumen();
     }
 
     window.eliminarProcesado = function(index){
-      state.procesado.splice(index, 1);
+      procesadoActual().splice(index, 1);
       renderProcesado();
       calcularResumen();
     }
@@ -1305,14 +1335,14 @@
       const desc = $('descOrigen').value;
       const kg = safeNum($('kgOrigen').value);
       const pzs = safeNum($('pzsOrigen').value);
-      const producto = $('producto').value;
+      const producto = productoActual();
 
       if(kg <= 0 && pzs <= 0){
         alert('Captura kilos o piezas en origen.');
         return;
       }
 
-      state.origen.push({
+      state.capturas[producto].origen.push({
         producto,
         desc: desc || 'Rastro',
         kg,
@@ -1328,14 +1358,14 @@
       const desc = $('descProcesado').value;
       const kg = safeNum($('kgProcesado').value);
       const pzs = safeNum($('pzsProcesado').value);
-      const producto = $('producto').value;
+      const producto = productoActual();
 
       if(kg <= 0 && pzs <= 0){
         alert('Captura kilos o piezas en procesado.');
         return;
       }
 
-      state.procesado.push({
+      state.capturas[producto].procesado.push({
         producto,
         desc: desc || 'Rastro',
         kg,
