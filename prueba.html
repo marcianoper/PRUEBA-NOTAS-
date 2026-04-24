@@ -458,6 +458,7 @@
         </div>
         <div class="pill" id="pillConexion">Conectando...</div>
       </div>
+
       <div class="card-body">
         <div class="toolbar">
           <div class="field">
@@ -488,6 +489,8 @@
         <div class="statusbar" style="margin-bottom:12px">
           <span class="pill" id="pillPrecioFuente">Esperando cargar precio...</span>
           <span class="pill warn" id="pillPrecioProducto">Base: — | Viaje aplicado: —</span>
+          <span class="pill info" id="pillAutoSave">Borrador: esperando...</span>
+          <span class="pill info" id="pillRealtime">Realtime: esperando...</span>
         </div>
 
         <div class="field">
@@ -496,7 +499,8 @@
         </div>
 
         <div class="statusbar">
-          <button class="btn" type="button" id="btnGuardarSupabase">Guardar en Supabase</button>
+          <button class="btn" type="button" id="btnGuardarSupabase">Guardar proceso final</button>
+          <button class="btn-soft" type="button" id="btnGuardarBorrador">Guardar borrador ahora</button>
           <button class="btn-soft" type="button" id="btnNuevo">Nuevo proceso</button>
           <button class="btn-dark" type="button" id="btnCargarHoy">Cargar hoy</button>
           <button class="btn-soft" type="button" id="btnBuscarFecha">Buscar por fecha</button>
@@ -775,23 +779,27 @@
   <script>
     const SUPABASE_URL = "https://lujroedkbgffobyblbie.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1anJvZWRrYmdmZm9ieWJsYmllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODkzNDgsImV4cCI6MjA3MDc2NTM0OH0.bSbBZeS59aPSEGPj1YGcmZCyQTfgf3fz9pNDuR2ID7c";
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const SUPABASE_COSTOS_URL = "https://lujroedkbgffobyblbie.supabase.co";
-    const SUPABASE_COSTOS_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1anJvZWRrYmdmZm9ieWJsYmllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODkzNDgsImV4cCI6MjA3MDc2NTM0OH0.bSbBZeS59aPSEGPj1YGcmZCyQTfgf3fz9pNDuR2ID7c";
-    const sbCostos = window.supabase.createClient(
-      SUPABASE_COSTOS_URL,
-      SUPABASE_COSTOS_ANON_KEY,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10
         }
       }
-    );
+    });
+
+    const sbCostos = sb;
 
     const COSTOS_FINALES_TABLE = 'costos_finales_por_producto';
+    const BORRADORES_TABLE = 'procesos_limpieza_borradores';
+    const PROCESOS_TABLE = 'procesos_limpieza';
+
     const $ = (id) => document.getElementById(id);
+    const CLIENT_ID = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
 
     const state = {
       capturas: {
@@ -800,7 +808,11 @@
         Pata: { origen: [], procesado: [] }
       },
       historial: [],
-      editId: null
+      editId: null,
+      autosaveTimer: null,
+      realtimeChannel: null,
+      cargandoRemoto: false,
+      cargandoInicial: true
     };
 
     function hoyISO(){
@@ -856,6 +868,18 @@
       const el = $('pillPrecioFuente');
       el.textContent = txt;
       el.className = `pill ${kind || ''}`.trim();
+    }
+
+    function setAutoSave(txt, tipo='info'){
+      const el = $('pillAutoSave');
+      el.textContent = txt;
+      el.className = `pill ${tipo}`.trim();
+    }
+
+    function setRealtime(txt, tipo='info'){
+      const el = $('pillRealtime');
+      el.textContent = txt;
+      el.className = `pill ${tipo}`.trim();
     }
 
     function getLabels(producto){
@@ -924,7 +948,7 @@
       if(!fecha || !productoBase){
         $('precioSucio').value = '';
         setPrecioStatus('warn', 'Falta fecha o producto');
-        calcularResumen();
+        calcularResumen(false);
         return;
       }
 
@@ -1006,7 +1030,7 @@
       renderOrigen();
       renderProcesado();
       actualizarEstadoCaptura();
-      calcularResumen();
+      calcularResumen(false);
     }
 
     function renderOrigen(){
@@ -1055,7 +1079,7 @@
       actualizarEstadoCaptura();
     }
 
-    function calcularResumen(){
+    function calcularResumen(guardar=true){
       const producto = productoActual();
       const fecha = $('fecha').value || null;
       const precioSucio = safeNum($('precioSucio').value);
@@ -1088,7 +1112,7 @@
       $('kpiPzsOrigen').textContent = fmtNum(pzsOrigen,0);
       $('kpiPzsProcesado').textContent = fmtNum(pzsProcesado,0);
 
-      return {
+      const data = {
         fecha,
         producto,
         precio_sucio_kg: precioSucio,
@@ -1105,23 +1129,180 @@
         procesado_detalle: [...procesado],
         observaciones: $('observaciones').value.trim()
       };
+
+      if(guardar) programarAutosave();
+
+      return data;
+    }
+
+    function getPayloadBorrador(){
+      return {
+        client_id: CLIENT_ID,
+        fecha: $('fecha').value,
+        producto_actual: $('producto').value,
+        precio_sucio: $('precioSucio').value,
+        observaciones: $('observaciones').value,
+        capturas: state.capturas,
+        editId: state.editId,
+        updated_at_local: new Date().toISOString()
+      };
+    }
+
+    function programarAutosave(){
+      if(state.cargandoRemoto || state.cargandoInicial) return;
+
+      clearTimeout(state.autosaveTimer);
+      setAutoSave('Borrador: guardando...', 'warn');
+
+      state.autosaveTimer = setTimeout(() => {
+        guardarBorradorSupabase(false);
+      }, 700);
+    }
+
+    async function guardarBorradorSupabase(showAlert=false){
+      const fecha = $('fecha').value;
+      if(!fecha) return;
+
+      const payload = getPayloadBorrador();
+
+      try{
+        const { error } = await sb
+          .from(BORRADORES_TABLE)
+          .upsert({
+            fecha,
+            payload,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'fecha' });
+
+        if(error) throw error;
+
+        setAutoSave('Borrador guardado en Supabase', 'ok');
+        if(showAlert) alert('Borrador guardado correctamente.');
+      }catch(err){
+        console.error(err);
+        setAutoSave('Borrador: error al guardar', 'danger');
+        if(showAlert) alert('Error al guardar borrador: ' + (err.message || err));
+      }
+    }
+
+    async function cargarBorradorFecha(fecha){
+      if(!fecha) return;
+
+      try{
+        const { data, error } = await sb
+          .from(BORRADORES_TABLE)
+          .select('*')
+          .eq('fecha', fecha)
+          .maybeSingle();
+
+        if(error) throw error;
+
+        if(!data || !data.payload){
+          setAutoSave('Borrador: sin captura previa', 'info');
+          return;
+        }
+
+        aplicarPayloadBorrador(data.payload, true);
+        setAutoSave('Borrador cargado', 'ok');
+      }catch(err){
+        console.error(err);
+        setAutoSave('Borrador: error al cargar', 'danger');
+      }
+    }
+
+    function aplicarPayloadBorrador(payload, forzar=false){
+      if(!payload) return;
+      if(!forzar && payload.client_id === CLIENT_ID) return;
+
+      state.cargandoRemoto = true;
+
+      if(payload.capturas){
+        state.capturas = {
+          Menudo: payload.capturas.Menudo || { origen: [], procesado: [] },
+          Libro: payload.capturas.Libro || { origen: [], procesado: [] },
+          Pata: payload.capturas.Pata || { origen: [], procesado: [] }
+        };
+      }
+
+      if(payload.producto_actual && ['Menudo','Libro','Pata'].includes(payload.producto_actual)){
+        $('producto').value = payload.producto_actual;
+      }
+
+      if(payload.observaciones !== undefined){
+        $('observaciones').value = payload.observaciones;
+      }
+
+      if(payload.editId !== undefined){
+        state.editId = payload.editId;
+      }
+
+      updateProductLabels();
+      renderOrigen();
+      renderProcesado();
+      actualizarEstadoCaptura();
+      calcularResumen(false);
+
+      state.cargandoRemoto = false;
+    }
+
+    function activarRealtimeBorrador(fecha){
+      if(state.realtimeChannel){
+        sb.removeChannel(state.realtimeChannel);
+        state.realtimeChannel = null;
+      }
+
+      if(!fecha){
+        setRealtime('Realtime: sin fecha', 'warn');
+        return;
+      }
+
+      setRealtime('Realtime: conectando...', 'warn');
+
+      state.realtimeChannel = sb
+        .channel(`limpieza-borrador-${fecha}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: BORRADORES_TABLE,
+            filter: `fecha=eq.${fecha}`
+          },
+          (payload) => {
+            if(payload.new && payload.new.payload){
+              aplicarPayloadBorrador(payload.new.payload, false);
+              setAutoSave('Borrador actualizado en tiempo real', 'ok');
+            }
+          }
+        )
+        .subscribe((status) => {
+          if(status === 'SUBSCRIBED'){
+            setRealtime('Realtime: activo', 'ok');
+          } else if(status === 'CHANNEL_ERROR'){
+            setRealtime('Realtime: error', 'danger');
+          } else {
+            setRealtime(`Realtime: ${status}`, 'info');
+          }
+        });
     }
 
     function limpiarInputsOrigen(){
       $('descOrigen').value = 'Rastro';
       $('kgOrigen').value = '';
       $('pzsOrigen').value = '';
-      $('descOrigen').focus();
+      $('kgOrigen').focus();
     }
 
     function limpiarInputsProcesado(){
       $('descProcesado').value = 'Rastro';
       $('kgProcesado').value = '';
       $('pzsProcesado').value = '';
-      $('descProcesado').focus();
+      $('kgProcesado').focus();
     }
 
-    function nuevoLote(){
+    async function nuevoLote(){
+      if(!confirm('¿Quieres limpiar la captura actual y empezar un nuevo proceso?')) return;
+
       state.editId = null;
       state.capturas = {
         Menudo: { origen: [], procesado: [] },
@@ -1130,27 +1311,34 @@
       };
 
       $('fecha').value = hoyISO();
+      $('buscarFecha').value = hoyISO();
+      $('producto').value = 'Menudo';
       $('precioSucio').value = '';
       $('observaciones').value = '';
       $('descOrigen').value = 'Rastro';
       $('descProcesado').value = 'Rastro';
 
+      activarRealtimeBorrador($('fecha').value);
+      updateProductLabels();
       renderOrigen();
       renderProcesado();
       actualizarEstadoCaptura();
-      calcularResumen();
-      cargarPrecioAutomatico();
+      calcularResumen(false);
+      await cargarPrecioAutomatico();
+      await guardarBorradorSupabase(false);
     }
 
     async function probarConexion(){
       try{
-        const [{ error: errorLimpieza }, { error: errorCostos }] = await Promise.all([
-          sb.from('procesos_limpieza').select('id').limit(1),
-          sbCostos.from(COSTOS_FINALES_TABLE).select('fecha').limit(1)
+        const [{ error: errorLimpieza }, { error: errorCostos }, { error: errorBorradores }] = await Promise.all([
+          sb.from(PROCESOS_TABLE).select('id').limit(1),
+          sbCostos.from(COSTOS_FINALES_TABLE).select('fecha').limit(1),
+          sb.from(BORRADORES_TABLE).select('fecha').limit(1)
         ]);
 
         if(errorLimpieza) throw errorLimpieza;
         if(errorCostos) throw errorCostos;
+        if(errorBorradores) throw errorBorradores;
 
         setConexion(true, 'Supabase conectado');
       }catch(err){
@@ -1160,7 +1348,7 @@
     }
 
     async function guardarEnSupabase(){
-      const data = calcularResumen();
+      const data = calcularResumen(false);
 
       if(!data.fecha){
         alert('Captura la fecha.');
@@ -1192,14 +1380,14 @@
 
         if(state.editId){
           res = await sb
-            .from('procesos_limpieza')
+            .from(PROCESOS_TABLE)
             .update(data)
             .eq('id', state.editId)
             .select()
             .single();
         } else {
           res = await sb
-            .from('procesos_limpieza')
+            .from(PROCESOS_TABLE)
             .insert(data)
             .select()
             .single();
@@ -1207,8 +1395,10 @@
 
         if(res.error) throw res.error;
 
-        alert(state.editId ? 'Proceso actualizado correctamente.' : 'Proceso guardado correctamente.');
-        state.editId = null;
+        state.editId = res.data?.id || null;
+
+        await guardarBorradorSupabase(false);
+        alert(state.editId ? 'Proceso guardado correctamente.' : 'Proceso guardado correctamente.');
         await cargarHistorial();
       }catch(err){
         console.error(err);
@@ -1219,7 +1409,7 @@
     async function cargarHistorial(){
       try{
         const { data, error } = await sb
-          .from('procesos_limpieza')
+          .from(PROCESOS_TABLE)
           .select('*')
           .order('fecha', { ascending:false })
           .order('id', { ascending:false })
@@ -1244,7 +1434,7 @@
 
       try{
         const { data, error } = await sb
-          .from('procesos_limpieza')
+          .from(PROCESOS_TABLE)
           .select('*')
           .eq('fecha', fecha)
           .order('id', { ascending:false });
@@ -1253,6 +1443,11 @@
 
         state.historial = data || [];
         renderHistorial();
+
+        $('fecha').value = fecha;
+        activarRealtimeBorrador(fecha);
+        await cargarBorradorFecha(fecha);
+        await cargarPrecioAutomatico();
       }catch(err){
         console.error(err);
         alert('Error al buscar por fecha: ' + (err.message || err));
@@ -1288,15 +1483,18 @@
     window.cargarRegistro = async function(id){
       try{
         const { data, error } = await sb
-          .from('procesos_limpieza')
+          .from(PROCESOS_TABLE)
           .select('*')
           .eq('id', id)
           .single();
 
         if(error) throw error;
 
+        state.cargandoRemoto = true;
+
         state.editId = data.id;
         $('fecha').value = data.fecha || '';
+        $('buscarFecha').value = data.fecha || hoyISO();
         $('producto').value = data.producto || 'Menudo';
         $('observaciones').value = data.observaciones || '';
 
@@ -1305,31 +1503,35 @@
           procesado: Array.isArray(data.procesado_detalle) ? data.procesado_detalle : []
         };
 
+        state.cargandoRemoto = false;
+
+        activarRealtimeBorrador($('fecha').value);
         updateProductLabels();
         renderOrigen();
         renderProcesado();
         actualizarEstadoCaptura();
         await cargarPrecioAutomatico();
-        calcularResumen();
+        calcularResumen(false);
+        await guardarBorradorSupabase(false);
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }catch(err){
         console.error(err);
         alert('No se pudo abrir el registro.');
       }
-    }
+    };
 
     window.eliminarOrigen = function(index){
       origenActual().splice(index, 1);
       renderOrigen();
       calcularResumen();
-    }
+    };
 
     window.eliminarProcesado = function(index){
       procesadoActual().splice(index, 1);
       renderProcesado();
       calcularResumen();
-    }
+    };
 
     $('btnAgregarOrigen').addEventListener('click', () => {
       const desc = $('descOrigen').value;
@@ -1378,6 +1580,7 @@
     });
 
     $('btnGuardarSupabase').addEventListener('click', guardarEnSupabase);
+    $('btnGuardarBorrador').addEventListener('click', () => guardarBorradorSupabase(true));
     $('btnNuevo').addEventListener('click', nuevoLote);
     $('btnBuscarFecha').addEventListener('click', buscarPorFecha);
     $('btnCargarHoy').addEventListener('click', cargarHoy);
@@ -1385,25 +1588,53 @@
     $('producto').addEventListener('change', async () => {
       updateProductLabels();
       await cargarPrecioAutomatico();
-    });
-
-    $('fecha').addEventListener('input', async () => {
       calcularResumen();
-      await cargarPrecioAutomatico();
     });
 
-    $('observaciones').addEventListener('input', calcularResumen);
+    $('fecha').addEventListener('change', async () => {
+      const fecha = $('fecha').value;
+      $('buscarFecha').value = fecha;
+      activarRealtimeBorrador(fecha);
+      await cargarBorradorFecha(fecha);
+      await cargarPrecioAutomatico();
+      calcularResumen();
+    });
+
+    $('observaciones').addEventListener('input', () => calcularResumen());
 
     ['kgOrigen','pzsOrigen'].forEach(id => {
       $(id).addEventListener('keydown', (e) => {
-        if(e.key === 'Enter') $('btnAgregarOrigen').click();
+        if(e.key === 'Enter'){
+          e.preventDefault();
+          $('btnAgregarOrigen').click();
+        }
       });
     });
 
     ['kgProcesado','pzsProcesado'].forEach(id => {
       $(id).addEventListener('keydown', (e) => {
-        if(e.key === 'Enter') $('btnAgregarProcesado').click();
+        if(e.key === 'Enter'){
+          e.preventDefault();
+          $('btnAgregarProcesado').click();
+        }
       });
+    });
+
+    window.addEventListener('beforeunload', () => {
+      if(!state.cargandoInicial){
+        const payload = getPayloadBorrador();
+        const fecha = $('fecha').value;
+        if(fecha){
+          navigator.sendBeacon?.(
+            `${SUPABASE_URL}/rest/v1/${BORRADORES_TABLE}`,
+            JSON.stringify({
+              fecha,
+              payload,
+              updated_at: new Date().toISOString()
+            })
+          );
+        }
+      }
     });
 
     window.addEventListener('load', async () => {
@@ -1411,14 +1642,21 @@
       $('buscarFecha').value = hoyISO();
       $('descOrigen').value = 'Rastro';
       $('descProcesado').value = 'Rastro';
+
       updateProductLabels();
       renderOrigen();
       renderProcesado();
       actualizarEstadoCaptura();
-      calcularResumen();
+      calcularResumen(false);
+
       await probarConexion();
+      activarRealtimeBorrador($('fecha').value);
+      await cargarBorradorFecha($('fecha').value);
       await cargarPrecioAutomatico();
       await cargarHistorial();
+
+      state.cargandoInicial = false;
+      setAutoSave('Borrador listo', 'ok');
     });
   </script>
 </body>
