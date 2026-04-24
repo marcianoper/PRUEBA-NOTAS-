@@ -504,6 +504,7 @@
           <button class="btn-soft" type="button" id="btnNuevo">Nuevo proceso</button>
           <button class="btn-dark" type="button" id="btnCargarHoy">Cargar hoy</button>
           <button class="btn-soft" type="button" id="btnBuscarFecha">Buscar por fecha</button>
+          <button class="btn-dark" type="button" id="btnWhatsappResumen">Enviar resumen WhatsApp</button>
         </div>
       </div>
     </section>
@@ -1398,7 +1399,7 @@
         state.editId = res.data?.id || null;
 
         await guardarBorradorSupabase(false);
-        alert(state.editId ? 'Proceso guardado correctamente.' : 'Proceso guardado correctamente.');
+        alert('Proceso guardado correctamente.');
         await cargarHistorial();
       }catch(err){
         console.error(err);
@@ -1478,6 +1479,76 @@
           <td><button class="btn-soft" type="button" onclick="cargarRegistro(${row.id})">Abrir</button></td>
         </tr>
       `).join('');
+    }
+
+    function generarResumenWhatsapp(){
+      const fecha = $('fecha').value || '—';
+
+      let mensaje = `*RESUMEN PROCESO DE LIMPIEZA — VDC 360°*\n`;
+      mensaje += `Fecha: ${fecha}\n\n`;
+
+      ['Menudo','Libro','Pata'].forEach(producto => {
+        const origen = state.capturas[producto]?.origen || [];
+        const procesado = state.capturas[producto]?.procesado || [];
+
+        const kgOrigen = totalKg(origen);
+        const pzsOrigen = totalPzs(origen);
+        const kgProcesado = totalKg(procesado);
+        const pzsProcesado = totalPzs(procesado);
+
+        if(kgOrigen <= 0 && kgProcesado <= 0 && pzsOrigen <= 0 && pzsProcesado <= 0) return;
+
+        let precioSucio = 0;
+
+        if(producto === productoActual()){
+          precioSucio = safeNum($('precioSucio').value);
+        }
+
+        const diferenciaKg = Math.max(kgOrigen - kgProcesado, 0);
+        const precioCompra = kgOrigen * precioSucio;
+        const costoMerma = diferenciaKg * precioSucio;
+        const porcentajeMerma = kgOrigen > 0 ? (diferenciaKg / kgOrigen) * 100 : 0;
+        const precioFinalLimpio = kgProcesado > 0 ? (precioCompra / kgProcesado) : 0;
+
+        mensaje += `*Producto:* ${producto}\n\n`;
+
+        mensaje += `*SUCIO ENVIADO A LIMPIEZA*\n`;
+        mensaje += `Piezas: ${fmtNum(pzsOrigen,0)} pzas\n`;
+        mensaje += `Peso: ${fmtNum(kgOrigen)} kg\n\n`;
+
+        mensaje += `*LIMPIO RECIBIDO*\n`;
+        mensaje += `Piezas: ${fmtNum(pzsProcesado,0)} pzas\n`;
+        mensaje += `Peso: ${fmtNum(kgProcesado)} kg\n\n`;
+
+        mensaje += `Precio por kg del producto sucio: ${precioSucio > 0 ? fmtMoney(precioSucio) : 'Pendiente'}\n`;
+        mensaje += `Diferencia en kg: ${fmtNum(diferenciaKg)} kg\n`;
+        mensaje += `Precio de compra total: ${precioSucio > 0 ? fmtMoney(precioCompra) : 'Pendiente'}\n`;
+        mensaje += `Costo de merma: ${precioSucio > 0 ? fmtMoney(costoMerma) : 'Pendiente'}\n`;
+        mensaje += `Porcentaje de merma: ${fmtNum(porcentajeMerma)}%\n`;
+        mensaje += `Precio final del producto limpio por kg: ${precioSucio > 0 && kgProcesado > 0 ? fmtMoney(precioFinalLimpio) : 'Pendiente'}\n`;
+
+        mensaje += `\n--------------------------\n\n`;
+      });
+
+      const obs = $('observaciones').value.trim();
+
+      if(obs){
+        mensaje += `*Observaciones:*\n${obs}\n\n`;
+      }
+
+      return mensaje;
+    }
+
+    function enviarResumenWhatsapp(){
+      const mensaje = generarResumenWhatsapp();
+
+      if(!mensaje.includes('*Producto:*')){
+        alert('No hay capturas para enviar.');
+        return;
+      }
+
+      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(mensaje)}`;
+      window.open(url, '_blank');
     }
 
     window.cargarRegistro = async function(id){
@@ -1584,6 +1655,7 @@
     $('btnNuevo').addEventListener('click', nuevoLote);
     $('btnBuscarFecha').addEventListener('click', buscarPorFecha);
     $('btnCargarHoy').addEventListener('click', cargarHoy);
+    $('btnWhatsappResumen').addEventListener('click', enviarResumenWhatsapp);
 
     $('producto').addEventListener('change', async () => {
       updateProductLabels();
