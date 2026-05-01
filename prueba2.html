@@ -890,8 +890,27 @@ function escapeHTML(v){
     .replaceAll("'","&#039;");
 }
 
+function fechaTicket(){
+  const hoy=new Date();
+  return hoy.toLocaleDateString('es-MX',{
+    day:'2-digit',
+    month:'2-digit',
+    year:'numeric'
+  });
+}
+
 function ticketNominaHTML(emp){
   const v=emp.values||{};
+
+  const sueldo=Number(v.SUELDO)||0;
+  const ext=Number(v.EXT)||0;
+  const total=Number(v.TOTAL)||0;
+  const imss=Number(v.IMSS)||0;
+  const isr=Number(v.ISR)||0;
+  const infonavit=Number(v.INFONAVIT)||0;
+  const neto=Number(v.NETO)||0;
+  const deposito=Number(v.DEPOSITO)||0;
+  const efectivo=Math.max(0, neto - deposito);
 
   return `
 <!doctype html>
@@ -910,21 +929,33 @@ function ticketNominaHTML(emp){
     margin:0;
     padding:0;
     width:80mm;
-    font-family:Arial, sans-serif;
-    font-size:12px;
-    color:#000;
     background:#fff;
+    color:#000;
+    font-family:Arial, Helvetica, sans-serif;
+    font-size:13px;
+    line-height:1.15;
   }
 
   .ticket{
     width:80mm;
-    padding:8px 10px;
+    padding:10px 12px 14px;
   }
 
-  .center{text-align:center}
-  .bold{font-weight:900}
-  .small{font-size:10px}
-  .line{
+  .titulo{
+    text-align:center;
+    font-size:17px;
+    font-weight:900;
+    letter-spacing:.2px;
+    margin-top:2px;
+  }
+
+  .subtitulo{
+    text-align:center;
+    font-size:12px;
+    margin-top:0;
+  }
+
+  .dash{
     border-top:1px dashed #000;
     margin:7px 0;
   }
@@ -932,13 +963,48 @@ function ticketNominaHTML(emp){
   .row{
     display:flex;
     justify-content:space-between;
+    align-items:flex-start;
     gap:8px;
+    margin:2px 0;
+  }
+
+  .label{
+    font-weight:900;
+    text-align:left;
+    white-space:nowrap;
+  }
+
+  .value{
+    font-weight:900;
+    text-align:right;
+    margin-left:auto;
+  }
+
+  .section .row{
     margin:3px 0;
   }
 
-  .big{
+  .total{
     font-size:15px;
     font-weight:900;
+  }
+
+  .firmaTexto{
+    margin-top:14px;
+    font-size:11px;
+    font-weight:700;
+  }
+
+  .firmaLinea{
+    border-top:1px solid #000;
+    margin-top:10px;
+    height:10px;
+  }
+
+  .gracias{
+    text-align:center;
+    margin-top:16px;
+    font-size:12px;
   }
 
   .alerta{
@@ -948,51 +1014,82 @@ function ticketNominaHTML(emp){
     text-align:center;
     font-weight:900;
   }
-
-  .firma{
-    margin-top:12px;
-    text-align:center;
-  }
 </style>
 </head>
 
 <body>
   <div class="ticket">
-    <div class="center bold">CARNES Y VÍSCERAS DEL CENTRO</div>
-    <div class="center">RECIBO DE NÓMINA</div>
+    <div class="titulo">SUELDOS</div>
+    <div class="subtitulo">RECIBO DE SUELDO</div>
 
-    <div class="line"></div>
+    <div class="dash"></div>
 
-    <div class="bold">${escapeHTML(emp.name)}</div>
-    <div>Área: ${escapeHTML(emp.area||'General')}</div>
-    <div>Periodo: ${escapeHTML(periodo||'')}</div>
-    <div>Días sueldo: ${Number(emp.dias_sueldo||0).toFixed(2)}</div>
+    <div class="row">
+      <div class="label">Empleado</div>
+      <div class="value">${escapeHTML(emp.name)}</div>
+    </div>
+    <div class="row">
+      <div class="label">Fecha</div>
+      <div class="value">${fechaTicket()}</div>
+    </div>
 
-    <div class="line"></div>
+    <div class="dash"></div>
 
-    <div class="row"><span>Sueldo</span><b>${money(v.SUELDO)}</b></div>
-    <div class="row"><span>Extra</span><b>${money(v.EXT)}</b></div>
-    <div class="row"><span>Total ingreso</span><b>${money(v.TOTAL)}</b></div>
+    <div class="section">
+      <div class="row">
+        <div class="label">SUELDO</div>
+        <div class="value">${money(sueldo)}</div>
+      </div>
+      <div class="row">
+        <div class="label">EXT</div>
+        <div class="value">${money(ext)}</div>
+      </div>
+      <div class="row">
+        <div class="label">TOTAL</div>
+        <div class="value">${money(total)}</div>
+      </div>
+    </div>
 
-    <div class="line"></div>
+    <div class="dash"></div>
 
-    <div class="row"><span>IMSS</span><b>${money(v.IMSS)}</b></div>
-    <div class="row"><span>ISR/Ajuste</span><b>${money(v.ISR)}</b></div>
-    <div class="row"><span>Infonavit</span><b>${money(v.INFONAVIT)}</b></div>
-    <div class="row"><span>A CTA</span><b>${money(v['A CTA'])}</b></div>
-    <div class="row"><span>Faltante</span><b>${money(v.FALTA)}</b></div>
+    <div class="section">
+      <div class="row">
+        <div class="label">MENOS IMSS</div>
+        <div class="value">${money(imss)}</div>
+      </div>
+      <div class="row">
+        <div class="label">MENOS ISR</div>
+        <div class="value">${money(isr)}</div>
+      </div>
+      <div class="row">
+        <div class="label">MENOS INFONAVIT</div>
+        <div class="value">${money(infonavit)}</div>
+      </div>
+    </div>
 
-    <div class="line"></div>
+    <div class="dash"></div>
 
-    <div class="row big"><span>Neto</span><b>${money(v.NETO)}</b></div>
-    <div class="row"><span>Depósito</span><b>${money(v.DEPOSITO)}</b></div>
+    <div class="section total">
+      <div class="row">
+        <div class="label">TOTAL A PAGAR</div>
+        <div class="value">${money(neto)}</div>
+      </div>
+      <div class="row">
+        <div class="label">DEPÓSITO</div>
+        <div class="value">${money(deposito)}</div>
+      </div>
+      <div class="row">
+        <div class="label">EFECTIVO</div>
+        <div class="value">${money(efectivo)}</div>
+      </div>
+    </div>
 
     ${emp.faltante_alerta?'<div class="alerta">REVISAR FALTANTE</div>':''}
 
-    <div class="line"></div>
-    <div class="firma">Firma: __________________</div>
-    <br>
-    <div class="center small">Gracias</div>
+    <div class="firmaTexto">Firma del trabajador</div>
+    <div class="firmaLinea"></div>
+
+    <div class="gracias">Gracias</div>
   </div>
 </body>
 </html>`;
