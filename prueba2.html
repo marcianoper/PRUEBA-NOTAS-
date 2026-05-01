@@ -911,6 +911,8 @@ function ticketNominaHTML(emp){
   const neto=Number(v.NETO)||0;
   const deposito=Number(v.DEPOSITO)||0;
   const efectivo=Math.max(0, neto - deposito);
+  const falta=Number(v.FALTA)||0;
+const diasFaltados=Math.max(0, 6 - Number(emp.dias_sueldo||6));
 
   return `
 <!doctype html>
@@ -1065,6 +1067,12 @@ function ticketNominaHTML(emp){
         <div class="label">MENOS INFONAVIT</div>
         <div class="value">${money(infonavit)}</div>
       </div>
+      ${falta > 0 && diasFaltados > 0 ? `
+  <div class="row">
+    <div class="label">FALTÓ ${Math.round(diasFaltados)} DÍA${Math.round(diasFaltados) === 1 ? '' : 'S'}</div>
+    <div class="value">${money(falta)}</div>
+  </div>
+` : ''}
     </div>
 
     <div class="dash"></div>
