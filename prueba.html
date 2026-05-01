@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -1482,115 +1483,69 @@
     }
 
     function generarResumenWhatsapp(){
-      const fecha = $('fecha').value || '—';
+  const fecha = $('fecha').value || '—';
+  const producto = productoActual();
 
-      let mensaje = `*RESUMEN PROCESO DE LIMPIEZA — VDC 360°*\n`;
-      mensaje += `Fecha: ${fecha}\n\n`;
+  const origen = state.capturas[producto]?.origen || [];
+  const procesado = state.capturas[producto]?.procesado || [];
 
-      ['Menudo','Libro','Pata'].forEach(producto => {
-        const origen = state.capturas[producto]?.origen || [];
-        const procesado = state.capturas[producto]?.procesado || [];
+  const kgOrigen = totalKg(origen);
+  const pzsOrigen = totalPzs(origen);
+  const kgProcesado = totalKg(procesado);
+  const pzsProcesado = totalPzs(procesado);
 
-        const kgOrigen = totalKg(origen);
-        const pzsOrigen = totalPzs(origen);
-        const kgProcesado = totalKg(procesado);
-        const pzsProcesado = totalPzs(procesado);
+  const precioSucio = safeNum($('precioSucio').value);
 
-        if(kgOrigen <= 0 && kgProcesado <= 0 && pzsOrigen <= 0 && pzsProcesado <= 0) return;
+  const diferenciaKg = Math.max(kgOrigen - kgProcesado, 0);
+  const precioCompra = kgOrigen * precioSucio;
+  const costoMerma = diferenciaKg * precioSucio;
+  const porcentajeMerma = kgOrigen > 0 ? (diferenciaKg / kgOrigen) * 100 : 0;
+  const precioFinalLimpio = kgProcesado > 0 ? (precioCompra / kgProcesado) : 0;
 
-        let precioSucio = 0;
+  let mensaje = `*RESUMEN INDIVIDUAL DE LIMPIEZA — VDC 360°*\n`;
+  mensaje += `Fecha: ${fecha}\n`;
+  mensaje += `Producto: *${producto}*\n\n`;
 
-        if(producto === productoActual()){
-          precioSucio = safeNum($('precioSucio').value);
-        }
+  mensaje += `*SUCIO ENVIADO A LIMPIEZA*\n`;
+  mensaje += `Piezas: ${fmtNum(pzsOrigen,0)} pzas\n`;
+  mensaje += `Peso: ${fmtNum(kgOrigen)} kg\n\n`;
 
-        const diferenciaKg = Math.max(kgOrigen - kgProcesado, 0);
-        const precioCompra = kgOrigen * precioSucio;
-        const costoMerma = diferenciaKg * precioSucio;
-        const porcentajeMerma = kgOrigen > 0 ? (diferenciaKg / kgOrigen) * 100 : 0;
-        const precioFinalLimpio = kgProcesado > 0 ? (precioCompra / kgProcesado) : 0;
+  mensaje += `*LIMPIO RECIBIDO*\n`;
+  mensaje += `Piezas: ${fmtNum(pzsProcesado,0)} pzas\n`;
+  mensaje += `Peso: ${fmtNum(kgProcesado)} kg\n\n`;
 
-        mensaje += `*Producto:* ${producto}\n\n`;
+  mensaje += `*CÁLCULO DEL PROCESO*\n`;
+  mensaje += `Precio kg sucio: ${precioSucio > 0 ? fmtMoney(precioSucio) : 'Pendiente'}\n`;
+  mensaje += `Diferencia / merma: ${fmtNum(diferenciaKg)} kg\n`;
+  mensaje += `Precio compra total: ${precioSucio > 0 ? fmtMoney(precioCompra) : 'Pendiente'}\n`;
+  mensaje += `Costo de merma: ${precioSucio > 0 ? fmtMoney(costoMerma) : 'Pendiente'}\n`;
+  mensaje += `% merma: ${fmtNum(porcentajeMerma)}%\n`;
+  mensaje += `Precio final limpio por kg: ${precioSucio > 0 && kgProcesado > 0 ? fmtMoney(precioFinalLimpio) : 'Pendiente'}\n\n`;
 
-        mensaje += `*SUCIO ENVIADO A LIMPIEZA*\n`;
-        mensaje += `Piezas: ${fmtNum(pzsOrigen,0)} pzas\n`;
-        mensaje += `Peso: ${fmtNum(kgOrigen)} kg\n\n`;
+  const obs = $('observaciones').value.trim();
+  if(obs){
+    mensaje += `*Observaciones:*\n${obs}\n\n`;
+  }
 
-        mensaje += `*LIMPIO RECIBIDO*\n`;
-        mensaje += `Piezas: ${fmtNum(pzsProcesado,0)} pzas\n`;
-        mensaje += `Peso: ${fmtNum(kgProcesado)} kg\n\n`;
+  mensaje += `— Carnes y Vísceras del Centro`;
 
-        mensaje += `Precio por kg del producto sucio: ${precioSucio > 0 ? fmtMoney(precioSucio) : 'Pendiente'}\n`;
-        mensaje += `Diferencia en kg: ${fmtNum(diferenciaKg)} kg\n`;
-        mensaje += `Precio de compra total: ${precioSucio > 0 ? fmtMoney(precioCompra) : 'Pendiente'}\n`;
-        mensaje += `Costo de merma: ${precioSucio > 0 ? fmtMoney(costoMerma) : 'Pendiente'}\n`;
-        mensaje += `Porcentaje de merma: ${fmtNum(porcentajeMerma)}%\n`;
-        mensaje += `Precio final del producto limpio por kg: ${precioSucio > 0 && kgProcesado > 0 ? fmtMoney(precioFinalLimpio) : 'Pendiente'}\n`;
+  return mensaje;
+}
 
-        mensaje += `\n--------------------------\n\n`;
-      });
+   function enviarResumenWhatsapp(){
+  const producto = productoActual();
+  const origen = state.capturas[producto]?.origen || [];
+  const procesado = state.capturas[producto]?.procesado || [];
 
-      const obs = $('observaciones').value.trim();
+  if(!origen.length && !procesado.length){
+    alert(`No hay capturas para enviar de ${producto}.`);
+    return;
+  }
 
-      if(obs){
-        mensaje += `*Observaciones:*\n${obs}\n\n`;
-      }
-
-      return mensaje;
-    }
-
-    function enviarResumenWhatsapp(){
-      const mensaje = generarResumenWhatsapp();
-
-      if(!mensaje.includes('*Producto:*')){
-        alert('No hay capturas para enviar.');
-        return;
-      }
-
-      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(mensaje)}`;
-      window.open(url, '_blank');
-    }
-
-    window.cargarRegistro = async function(id){
-      try{
-        const { data, error } = await sb
-          .from(PROCESOS_TABLE)
-          .select('*')
-          .eq('id', id)
-          .single();
-
-        if(error) throw error;
-
-        state.cargandoRemoto = true;
-
-        state.editId = data.id;
-        $('fecha').value = data.fecha || '';
-        $('buscarFecha').value = data.fecha || hoyISO();
-        $('producto').value = data.producto || 'Menudo';
-        $('observaciones').value = data.observaciones || '';
-
-        state.capturas[data.producto] = {
-          origen: Array.isArray(data.origen_detalle) ? data.origen_detalle : [],
-          procesado: Array.isArray(data.procesado_detalle) ? data.procesado_detalle : []
-        };
-
-        state.cargandoRemoto = false;
-
-        activarRealtimeBorrador($('fecha').value);
-        updateProductLabels();
-        renderOrigen();
-        renderProcesado();
-        actualizarEstadoCaptura();
-        await cargarPrecioAutomatico();
-        calcularResumen(false);
-        await guardarBorradorSupabase(false);
-
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }catch(err){
-        console.error(err);
-        alert('No se pudo abrir el registro.');
-      }
-    };
+  const mensaje = generarResumenWhatsapp();
+  const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(mensaje)}`;
+  window.open(url, '_blank');
+}
 
     window.eliminarOrigen = function(index){
       origenActual().splice(index, 1);
