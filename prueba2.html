@@ -1,1 +1,1690 @@
 
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VDC 360° — Proceso de Limpieza</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root{
+      --brand:#0a7a3b;
+      --brand2:#0f9a52;
+      --bg:#f6f7f8;
+      --card:#ffffff;
+      --ink:#0f172a;
+      --muted:#64748b;
+      --line:#e5e7eb;
+      --shadow:0 18px 50px rgba(2,6,23,.10);
+      --shadow2:0 10px 24px rgba(2,6,23,.08);
+      --danger:#b91c1c;
+      --warn:#b45309;
+      --ok:#166534;
+      --yellow:#fff59d;
+      --radius:18px;
+    }
+
+    *{ box-sizing:border-box; }
+
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(1200px 520px at 18% -10%, rgba(15,154,82,.16), transparent 45%),
+        linear-gradient(180deg, #f9fbfa 0%, var(--bg) 100%);
+    }
+
+    header{
+      position:sticky;
+      top:0;
+      z-index:30;
+      background:rgba(255,255,255,.92);
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--line);
+    }
+
+    .header-wrap{
+      max-width:1500px;
+      margin:0 auto;
+      padding:14px 18px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      flex-wrap:wrap;
+    }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+
+    .logo{
+      width:44px;
+      height:44px;
+      border-radius:14px;
+      background:linear-gradient(135deg,var(--brand),var(--brand2));
+      color:#fff;
+      display:grid;
+      place-items:center;
+      font-weight:800;
+      box-shadow:var(--shadow2);
+    }
+
+    .title h1{
+      margin:0;
+      font-size:20px;
+      line-height:1.1;
+    }
+
+    .title p{
+      margin:4px 0 0;
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    .badge{
+      border:1px solid rgba(10,122,59,.18);
+      background:rgba(10,122,59,.08);
+      color:var(--brand);
+      padding:8px 12px;
+      border-radius:999px;
+      font-weight:700;
+      font-size:12px;
+      white-space:nowrap;
+    }
+
+    main{
+      max-width:1500px;
+      margin:0 auto;
+      padding:22px 18px 40px;
+      display:grid;
+      gap:18px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap:18px;
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid rgba(15,23,42,.06);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+
+    .card-head{
+      padding:16px 18px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+
+    .card-head h2,
+    .card-head h3{
+      margin:0;
+      font-size:18px;
+    }
+
+    .card-head p{
+      margin:4px 0 0;
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    .card-body{
+      padding:18px;
+    }
+
+    .toolbar{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(140px, 1fr));
+      gap:12px;
+      margin-bottom:18px;
+    }
+
+    .field{
+      display:grid;
+      gap:7px;
+    }
+
+    .field label{
+      font-size:13px;
+      color:var(--muted);
+      font-weight:700;
+    }
+
+    input, select, button, textarea{
+      font:inherit;
+    }
+
+    input, select, textarea{
+      width:100%;
+      border:1px solid #dbe2ea;
+      background:#fff;
+      color:var(--ink);
+      border-radius:14px;
+      padding:12px 14px;
+      outline:none;
+      transition:.18s ease;
+    }
+
+    input:focus, select:focus, textarea:focus{
+      border-color:rgba(10,122,59,.45);
+      box-shadow:0 0 0 4px rgba(10,122,59,.10);
+    }
+
+    textarea{
+      min-height:92px;
+      resize:vertical;
+    }
+
+    .readonly-input{
+      background:#f8fafc !important;
+      color:var(--ink);
+      font-weight:800;
+    }
+
+    button{
+      border:none;
+      cursor:pointer;
+      border-radius:14px;
+      padding:12px 16px;
+      font-weight:800;
+      transition:.18s ease;
+    }
+
+    .btn{
+      background:linear-gradient(135deg,var(--brand),var(--brand2));
+      color:#fff;
+      box-shadow:var(--shadow2);
+    }
+
+    .btn:hover{ transform:translateY(-1px); }
+
+    .btn-soft{
+      background:#eef7f1;
+      color:var(--brand);
+      border:1px solid rgba(10,122,59,.14);
+    }
+
+    .btn-danger{
+      background:#fff1f2;
+      color:var(--danger);
+      border:1px solid rgba(185,28,28,.16);
+    }
+
+    .btn-dark{
+      background:#0f172a;
+      color:#fff;
+    }
+
+    .capture-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:18px;
+      align-items:start;
+    }
+
+    .subcard{
+      border:1px solid var(--line);
+      border-radius:18px;
+      overflow:hidden;
+      background:#fff;
+    }
+
+    .subhead{
+      padding:14px 16px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .subhead h4{
+      margin:0;
+      font-size:16px;
+    }
+
+    .subbody{
+      padding:14px;
+      display:grid;
+      gap:12px;
+    }
+
+    .row-form{
+      display:grid;
+      grid-template-columns: 1fr 1fr .8fr .8fr auto;
+      gap:10px;
+      align-items:end;
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+    }
+
+    th, td{
+      border-bottom:1px solid var(--line);
+      padding:10px 8px;
+      text-align:left;
+      font-size:14px;
+      vertical-align:middle;
+    }
+
+    th{
+      color:var(--muted);
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      font-weight:800;
+      background:#fafbfc;
+    }
+
+    .table-wrap{
+      overflow:auto;
+      border:1px solid var(--line);
+      border-radius:14px;
+    }
+
+    .num{
+      text-align:right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:7px 10px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:800;
+      background:#f8fafc;
+      border:1px solid var(--line);
+      color:var(--ink);
+    }
+
+    .pill.ok{
+      background:#eefaf2;
+      color:var(--ok);
+      border-color:#ccefd8;
+    }
+
+    .pill.warn{
+      background:#fff8eb;
+      color:var(--warn);
+      border-color:#f6ddb6;
+    }
+
+    .pill.danger{
+      background:#fff1f2;
+      color:var(--danger);
+      border-color:#fecdd3;
+    }
+
+    .pill.info{
+      background:#eff6ff;
+      color:#1d4ed8;
+      border-color:#bfdbfe;
+    }
+
+    .kpis{
+      display:grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap:12px;
+    }
+
+    .kpi{
+      border:1px solid var(--line);
+      background:linear-gradient(180deg,#fff,#fbfcfd);
+      border-radius:18px;
+      padding:14px;
+      box-shadow:var(--shadow2);
+    }
+
+    .kpi .label{
+      color:var(--muted);
+      font-size:12px;
+      font-weight:800;
+      text-transform:uppercase;
+      letter-spacing:.05em;
+      margin-bottom:8px;
+    }
+
+    .kpi .value{
+      font-size:28px;
+      font-weight:900;
+      line-height:1;
+      margin-bottom:6px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .kpi .meta{
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .hl{
+      background:var(--yellow);
+      padding:2px 6px;
+      border-radius:8px;
+    }
+
+    .summary-table td:first-child{
+      font-weight:800;
+    }
+
+    .summary-table td:last-child{
+      text-align:right;
+      font-variant-numeric: tabular-nums;
+      font-weight:800;
+    }
+
+    .summary-table .auto{
+      background:#fffef1;
+    }
+
+    .empty{
+      padding:20px;
+      text-align:center;
+      color:var(--muted);
+    }
+
+    .statusbar{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:12px;
+    }
+
+    .history-wrap{
+      overflow:auto;
+      max-height:500px;
+      border:1px solid var(--line);
+      border-radius:16px;
+    }
+
+    .section-gap{
+      margin-top:18px;
+    }
+
+    @media (max-width: 1200px){
+      .grid{ grid-template-columns:1fr; }
+      .capture-grid{ grid-template-columns:1fr; }
+      .toolbar{ grid-template-columns:repeat(2,1fr); }
+    }
+
+    @media (max-width: 760px){
+      .toolbar,
+      .row-form,
+      .kpis{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-wrap">
+      <div class="brand">
+        <div class="logo">VDC</div>
+        <div class="title">
+          <h1>Proceso de Limpieza — VDC 360</h1>
+          <p>Registro de producto sucio, producto limpio, merma y costo final.</p>
+        </div>
+      </div>
+      <div class="badge">Supabase conectado</div>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Configuración y datos del proceso</h2>
+          <p>Captura el producto y observaciones del proceso. El precio se toma automáticamente del viaje aplicable.</p>
+        </div>
+        <div class="pill" id="pillConexion">Conectando...</div>
+      </div>
+
+      <div class="card-body">
+        <div class="toolbar">
+          <div class="field">
+            <label for="fecha">Fecha</label>
+            <input type="date" id="fecha" />
+          </div>
+
+          <div class="field">
+            <label for="producto">Producto</label>
+            <select id="producto">
+              <option value="Menudo">Menudo</option>
+              <option value="Libro">Libro</option>
+              <option value="Pata">Pata</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="precioSucio">Precio por kg del producto sucio</label>
+            <input class="readonly-input" type="text" id="precioSucio" readonly />
+          </div>
+
+          <div class="field">
+            <label for="buscarFecha">Consultar fecha</label>
+            <input type="date" id="buscarFecha" />
+          </div>
+        </div>
+
+        <div class="statusbar" style="margin-bottom:12px">
+          <span class="pill" id="pillPrecioFuente">Esperando cargar precio...</span>
+          <span class="pill warn" id="pillPrecioProducto">Base: — | Viaje aplicado: —</span>
+          <span class="pill info" id="pillAutoSave">Borrador: esperando...</span>
+          <span class="pill info" id="pillRealtime">Realtime: esperando...</span>
+        </div>
+
+        <div class="field">
+          <label for="observaciones">Observaciones</label>
+          <textarea id="observaciones" placeholder="Ej. lote con olor fuerte, regresó al día siguiente, limpieza especial, etc."></textarea>
+        </div>
+
+        <div class="statusbar">
+          <button class="btn" type="button" id="btnGuardarSupabase">Guardar proceso final</button>
+          <button class="btn-soft" type="button" id="btnGuardarBorrador">Guardar borrador ahora</button>
+          <button class="btn-soft" type="button" id="btnNuevo">Nuevo proceso</button>
+          <button class="btn-dark" type="button" id="btnCargarHoy">Cargar hoy</button>
+          <button class="btn-soft" type="button" id="btnBuscarFecha">Buscar por fecha</button>
+          <button class="btn-dark" type="button" id="btnWhatsappResumen">Enviar resumen WhatsApp</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Captura del proceso</h2>
+          <p>Registra tandas enviadas a limpieza y tandas recibidas ya limpias.</p>
+        </div>
+      </div>
+
+      <div class="statusbar" style="padding:14px 18px 0;">
+        <span class="pill info" id="pillProductoActual">Producto actual: Menudo</span>
+        <span class="pill warn" id="pillOrigenCount">Origen capturado: 0 tandas</span>
+        <span class="pill warn" id="pillProcesadoCount">Procesado capturado: 0 tandas</span>
+        <span class="pill warn" id="pillEstadoCaptura">Estado: Sin capturas</span>
+      </div>
+
+      <div class="card-body">
+        <div class="capture-grid">
+          <div class="subcard">
+            <div class="subhead">
+              <h4>Origen — producto sucio</h4>
+              <span class="pill" id="labelOrigen">Menudo sucio</span>
+            </div>
+            <div class="subbody">
+              <div class="row-form">
+                <div class="field">
+                  <label>Producto</label>
+                  <input class="readonly-input" type="text" id="productoOrigenView" readonly />
+                </div>
+                <div class="field">
+                  <label>Origen</label>
+                  <select id="descOrigen">
+                    <option value="Rastro">Rastro</option>
+                    <option value="Viaje">Viaje</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Kg</label>
+                  <input type="number" id="kgOrigen" min="0" step="0.01" placeholder="0" />
+                </div>
+                <div class="field">
+                  <label>Piezas</label>
+                  <input type="number" id="pzsOrigen" min="0" step="1" placeholder="0" />
+                </div>
+                <button class="btn" type="button" id="btnAgregarOrigen">+ Agregar</button>
+              </div>
+
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Producto</th>
+                      <th>Origen</th>
+                      <th class="num">Kg</th>
+                      <th class="num">Pzs</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbodyOrigen">
+                    <tr><td colspan="5" class="empty">Aún no hay capturas de origen.</td></tr>
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th colspan="2">Total</th>
+                      <th class="num" id="totalKgOrigen">0.00</th>
+                      <th class="num" id="totalPzsOrigen">0</th>
+                      <th></th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="subcard">
+            <div class="subhead">
+              <h4>Ya procesado — producto limpio</h4>
+              <span class="pill" id="labelProcesado">Menudo limpio</span>
+            </div>
+            <div class="subbody">
+              <div class="row-form">
+                <div class="field">
+                  <label>Producto</label>
+                  <input class="readonly-input" type="text" id="productoProcesadoView" readonly />
+                </div>
+                <div class="field">
+                  <label>Origen</label>
+                  <select id="descProcesado">
+                    <option value="Rastro">Rastro</option>
+                    <option value="Viaje">Viaje</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Kg</label>
+                  <input type="number" id="kgProcesado" min="0" step="0.01" placeholder="0" />
+                </div>
+                <div class="field">
+                  <label>Piezas</label>
+                  <input type="number" id="pzsProcesado" min="0" step="1" placeholder="0" />
+                </div>
+                <button class="btn" type="button" id="btnAgregarProcesado">+ Agregar</button>
+              </div>
+
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Producto</th>
+                      <th>Origen</th>
+                      <th class="num">Kg</th>
+                      <th class="num">Pzs</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbodyProcesado">
+                    <tr><td colspan="5" class="empty">Aún no hay capturas procesadas.</td></tr>
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th colspan="2">Total</th>
+                      <th class="num" id="totalKgProcesado">0.00</th>
+                      <th class="num" id="totalPzsProcesado">0</th>
+                      <th></th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-gap table-wrap">
+          <table class="summary-table">
+            <tbody>
+              <tr>
+                <td>Producto</td>
+                <td id="resProducto">Menudo</td>
+              </tr>
+              <tr>
+                <td>Fecha</td>
+                <td id="resFecha">—</td>
+              </tr>
+              <tr>
+                <td>Precio por kg del producto sucio</td>
+                <td id="resPrecioSucio">$0.00</td>
+              </tr>
+              <tr class="auto">
+                <td><span class="hl">Diferencia en kg</span></td>
+                <td id="resDiferenciaKg">0.00 kg</td>
+              </tr>
+              <tr>
+                <td>Precio de compra total</td>
+                <td id="resPrecioCompra">$0.00</td>
+              </tr>
+              <tr class="auto">
+                <td><span class="hl">Costo de merma</span></td>
+                <td id="resCostoMerma">$0.00</td>
+              </tr>
+              <tr class="auto">
+                <td><span class="hl">Porcentaje de merma</span></td>
+                <td id="resPorcentajeMerma">0.00%</td>
+              </tr>
+              <tr class="auto">
+                <td><span class="hl">Precio final del producto limpio por kg</span></td>
+                <td id="resPrecioFinalLimpio">$0.00</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section-gap kpis">
+          <div class="kpi">
+            <div class="label">Kg origen</div>
+            <div class="value" id="kpiKgOrigen">0.00</div>
+            <div class="meta">Producto sucio enviado a limpieza</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Kg procesado</div>
+            <div class="value" id="kpiKgProcesado">0.00</div>
+            <div class="meta">Producto limpio recibido</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Piezas origen</div>
+            <div class="value" id="kpiPzsOrigen">0</div>
+            <div class="meta">Antes del proceso</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Piezas procesadas</div>
+            <div class="value" id="kpiPzsProcesado">0</div>
+            <div class="meta">Después del proceso</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Historial reciente</h3>
+            <p>Últimos procesos guardados en Supabase.</p>
+          </div>
+          <div class="pill" id="countHistorial">0 registros</div>
+        </div>
+        <div class="card-body">
+          <div class="history-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Producto</th>
+                  <th class="num">Kg origen</th>
+                  <th class="num">Kg limpio</th>
+                  <th class="num">% merma</th>
+                  <th class="num">Precio limpio</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyHistorial">
+                <tr><td colspan="7" class="empty">Sin registros todavía.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Ayuda de cálculo</h3>
+            <p>Esto es lo que el sistema calcula automáticamente.</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table>
+              <tbody>
+                <tr>
+                  <td><strong>Precio compra total</strong></td>
+                  <td>kg origen × precio sucio</td>
+                </tr>
+                <tr>
+                  <td><strong>Diferencia de kg</strong></td>
+                  <td>kg origen − kg procesado</td>
+                </tr>
+                <tr>
+                  <td><strong>Costo merma</strong></td>
+                  <td>diferencia kg × precio sucio</td>
+                </tr>
+                <tr>
+                  <td><strong>% merma</strong></td>
+                  <td>(diferencia ÷ kg origen) × 100</td>
+                </tr>
+                <tr>
+                  <td><strong>Precio limpio final</strong></td>
+                  <td>precio compra total ÷ kg procesado</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="section-gap">
+            <div class="pill warn">Tip: la merma se calcula de manera independiente por Menudo, Libro y Pata.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const SUPABASE_URL = "https://lujroedkbgffobyblbie.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1anJvZWRrYmdmZm9ieWJsYmllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODkzNDgsImV4cCI6MjA3MDc2NTM0OH0.bSbBZeS59aPSEGPj1YGcmZCyQTfgf3fz9pNDuR2ID7c";
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10
+        }
+      }
+    });
+
+    const sbCostos = sb;
+
+    const COSTOS_FINALES_TABLE = 'costos_finales_por_producto';
+    const BORRADORES_TABLE = 'procesos_limpieza_borradores';
+    const PROCESOS_TABLE = 'procesos_limpieza';
+
+    const $ = (id) => document.getElementById(id);
+    const CLIENT_ID = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
+
+    const state = {
+      capturas: {
+        Menudo: { origen: [], procesado: [] },
+        Libro: { origen: [], procesado: [] },
+        Pata: { origen: [], procesado: [] }
+      },
+      historial: [],
+      editId: null,
+      autosaveTimer: null,
+      realtimeChannel: null,
+      cargandoRemoto: false,
+      cargandoInicial: true
+    };
+
+    function hoyISO(){
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const day = String(d.getDate()).padStart(2,'0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function fmtNum(n, dec=2){
+      const v = Number(n || 0);
+      return v.toLocaleString('es-MX', {
+        minimumFractionDigits: dec,
+        maximumFractionDigits: dec
+      });
+    }
+
+    function fmtMoney(n){
+      const v = Number(n || 0);
+      return v.toLocaleString('es-MX', {
+        style:'currency',
+        currency:'MXN',
+        minimumFractionDigits:2,
+        maximumFractionDigits:2
+      });
+    }
+
+    function safeNum(v){
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function productoActual(){
+      return $('producto').value;
+    }
+
+    function origenActual(){
+      return state.capturas[productoActual()].origen;
+    }
+
+    function procesadoActual(){
+      return state.capturas[productoActual()].procesado;
+    }
+
+    function setConexion(ok, txt){
+      const el = $('pillConexion');
+      el.textContent = txt;
+      el.className = ok ? 'pill ok' : 'pill warn';
+    }
+
+    function setPrecioStatus(kind, txt){
+      const el = $('pillPrecioFuente');
+      el.textContent = txt;
+      el.className = `pill ${kind || ''}`.trim();
+    }
+
+    function setAutoSave(txt, tipo='info'){
+      const el = $('pillAutoSave');
+      el.textContent = txt;
+      el.className = `pill ${tipo}`.trim();
+    }
+
+    function setRealtime(txt, tipo='info'){
+      const el = $('pillRealtime');
+      el.textContent = txt;
+      el.className = `pill ${tipo}`.trim();
+    }
+
+    function getLabels(producto){
+      if(producto === 'Menudo') return { origen:'Menudo sucio', procesado:'Menudo limpio' };
+      if(producto === 'Libro') return { origen:'Libro sucio', procesado:'Libro limpio' };
+      if(producto === 'Pata') return { origen:'Pata sucia', procesado:'Pata limpia' };
+      return { origen:'Producto sucio', procesado:'Producto limpio' };
+    }
+
+    function getCostoBaseProducto(producto){
+      if(producto === 'Menudo') return 'Panza';
+      if(producto === 'Libro') return 'Libro';
+      if(producto === 'Pata') return 'Pata';
+      return '';
+    }
+
+    function toLocalDateParts(dateStr){
+      const [y, m, d] = String(dateStr).split('-').map(Number);
+      return new Date(y, (m || 1) - 1, d || 1);
+    }
+
+    function formatDateLocal(date){
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function addDays(date, days){
+      const copy = new Date(date);
+      copy.setDate(copy.getDate() + days);
+      return copy;
+    }
+
+    function getFechaViajeAplicable(fechaSeleccionada){
+      const date = toLocalDateParts(fechaSeleccionada);
+      const day = date.getDay();
+      let viajeDate;
+
+      if(day === 1){
+        viajeDate = addDays(date, -3);
+      } else if(day === 2){
+        viajeDate = addDays(date, -4);
+      } else if(day === 3){
+        viajeDate = addDays(date, -1);
+      } else if(day === 4){
+        viajeDate = addDays(date, -2);
+      } else if(day === 5){
+        viajeDate = addDays(date, -1);
+      } else if(day === 6){
+        viajeDate = addDays(date, -1);
+      } else {
+        viajeDate = addDays(date, -2);
+      }
+
+      return formatDateLocal(viajeDate);
+    }
+
+    async function cargarPrecioAutomatico(){
+      const fecha = $('fecha').value;
+      const producto = productoActual();
+      const productoBase = getCostoBaseProducto(producto);
+
+      $('pillPrecioProducto').textContent = `Base: ${productoBase || '—'} | Viaje aplicado: ${fecha ? getFechaViajeAplicable(fecha) : '—'}`;
+
+      if(!fecha || !productoBase){
+        $('precioSucio').value = '';
+        setPrecioStatus('warn', 'Falta fecha o producto');
+        calcularResumen(false);
+        return;
+      }
+
+      const fechaViajeAplicable = getFechaViajeAplicable(fecha);
+
+      try{
+        const { data, error } = await sbCostos
+          .from(COSTOS_FINALES_TABLE)
+          .select('fecha, producto, costo_final')
+          .eq('fecha', fechaViajeAplicable)
+          .eq('producto', productoBase)
+          .order('updated_at', { ascending: false })
+          .limit(1);
+
+        if(error) throw error;
+
+        const row = Array.isArray(data) && data.length ? data[0] : null;
+
+        if(!row){
+          $('precioSucio').value = '';
+          setPrecioStatus('danger', `No hay precio para ${productoBase} del viaje ${fechaViajeAplicable}`);
+          calcularResumen();
+          return;
+        }
+
+        const precio = Number(row.costo_final || 0);
+        $('precioSucio').value = precio > 0 ? String(precio) : '';
+        setPrecioStatus('ok', `Precio de ${productoBase} tomado del viaje ${fechaViajeAplicable}`);
+        calcularResumen();
+      }catch(err){
+        console.error(err);
+        $('precioSucio').value = '';
+        setPrecioStatus('danger', 'Error al cargar el precio automático');
+        calcularResumen();
+      }
+    }
+
+    function totalKg(arr){
+      return arr.reduce((acc, it) => acc + safeNum(it.kg), 0);
+    }
+
+    function totalPzs(arr){
+      return arr.reduce((acc, it) => acc + safeNum(it.pzs), 0);
+    }
+
+    function actualizarEstadoCaptura(){
+      const producto = productoActual();
+      const origenCount = state.capturas[producto].origen.length;
+      const procesadoCount = state.capturas[producto].procesado.length;
+
+      $('pillProductoActual').textContent = `Producto actual: ${producto}`;
+      $('pillOrigenCount').textContent = `Origen capturado: ${origenCount} tanda${origenCount === 1 ? '' : 's'}`;
+      $('pillProcesadoCount').textContent = `Procesado capturado: ${procesadoCount} tanda${procesadoCount === 1 ? '' : 's'}`;
+
+      if(origenCount === 0 && procesadoCount === 0){
+        $('pillEstadoCaptura').textContent = 'Estado: Sin capturas';
+        $('pillEstadoCaptura').className = 'pill warn';
+      } else if(origenCount > 0 && procesadoCount === 0){
+        $('pillEstadoCaptura').textContent = 'Estado: Falta capturar limpio';
+        $('pillEstadoCaptura').className = 'pill danger';
+      } else if(origenCount > 0 && procesadoCount > 0){
+        $('pillEstadoCaptura').textContent = 'Estado: Captura en proceso';
+        $('pillEstadoCaptura').className = 'pill ok';
+      } else {
+        $('pillEstadoCaptura').textContent = 'Estado: Revisar captura';
+        $('pillEstadoCaptura').className = 'pill info';
+      }
+    }
+
+    function updateProductLabels(){
+      const producto = productoActual();
+      const labels = getLabels(producto);
+
+      $('labelOrigen').textContent = labels.origen;
+      $('labelProcesado').textContent = labels.procesado;
+      $('productoOrigenView').value = producto;
+      $('productoProcesadoView').value = producto;
+
+      renderOrigen();
+      renderProcesado();
+      actualizarEstadoCaptura();
+      calcularResumen(false);
+    }
+
+    function renderOrigen(){
+      const tbody = $('tbodyOrigen');
+      const arr = origenActual();
+
+      if(!arr.length){
+        tbody.innerHTML = `<tr><td colspan="5" class="empty">Aún no hay capturas de origen.</td></tr>`;
+      } else {
+        tbody.innerHTML = arr.map((it, idx) => `
+          <tr>
+            <td>${it.producto || '-'}</td>
+            <td>${it.desc || 'Sin origen'}</td>
+            <td class="num">${fmtNum(it.kg)}</td>
+            <td class="num">${fmtNum(it.pzs,0)}</td>
+            <td><button class="btn-danger" type="button" onclick="eliminarOrigen(${idx})">Eliminar</button></td>
+          </tr>
+        `).join('');
+      }
+
+      $('totalKgOrigen').textContent = fmtNum(totalKg(arr));
+      $('totalPzsOrigen').textContent = fmtNum(totalPzs(arr),0);
+      actualizarEstadoCaptura();
+    }
+
+    function renderProcesado(){
+      const tbody = $('tbodyProcesado');
+      const arr = procesadoActual();
+
+      if(!arr.length){
+        tbody.innerHTML = `<tr><td colspan="5" class="empty">Aún no hay capturas procesadas.</td></tr>`;
+      } else {
+        tbody.innerHTML = arr.map((it, idx) => `
+          <tr>
+            <td>${it.producto || '-'}</td>
+            <td>${it.desc || 'Sin origen'}</td>
+            <td class="num">${fmtNum(it.kg)}</td>
+            <td class="num">${fmtNum(it.pzs,0)}</td>
+            <td><button class="btn-danger" type="button" onclick="eliminarProcesado(${idx})">Eliminar</button></td>
+          </tr>
+        `).join('');
+      }
+
+      $('totalKgProcesado').textContent = fmtNum(totalKg(arr));
+      $('totalPzsProcesado').textContent = fmtNum(totalPzs(arr),0);
+      actualizarEstadoCaptura();
+    }
+
+    function calcularResumen(guardar=true){
+      const producto = productoActual();
+      const fecha = $('fecha').value || null;
+      const precioSucio = safeNum($('precioSucio').value);
+
+      const origen = origenActual();
+      const procesado = procesadoActual();
+
+      const kgOrigen = totalKg(origen);
+      const pzsOrigen = totalPzs(origen);
+      const kgProcesado = totalKg(procesado);
+      const pzsProcesado = totalPzs(procesado);
+
+      const diferenciaKg = Math.max(kgOrigen - kgProcesado, 0);
+      const precioCompra = kgOrigen * precioSucio;
+      const costoMerma = diferenciaKg * precioSucio;
+      const porcentajeMerma = kgOrigen > 0 ? (diferenciaKg / kgOrigen) * 100 : 0;
+      const precioFinalLimpio = kgProcesado > 0 ? (precioCompra / kgProcesado) : 0;
+
+      $('resProducto').textContent = producto;
+      $('resFecha').textContent = fecha || '—';
+      $('resPrecioSucio').textContent = fmtMoney(precioSucio);
+      $('resDiferenciaKg').textContent = `${fmtNum(diferenciaKg)} kg`;
+      $('resPrecioCompra').textContent = fmtMoney(precioCompra);
+      $('resCostoMerma').textContent = fmtMoney(costoMerma);
+      $('resPorcentajeMerma').textContent = `${fmtNum(porcentajeMerma)}%`;
+      $('resPrecioFinalLimpio').textContent = fmtMoney(precioFinalLimpio);
+
+      $('kpiKgOrigen').textContent = fmtNum(kgOrigen);
+      $('kpiKgProcesado').textContent = fmtNum(kgProcesado);
+      $('kpiPzsOrigen').textContent = fmtNum(pzsOrigen,0);
+      $('kpiPzsProcesado').textContent = fmtNum(pzsProcesado,0);
+
+      const data = {
+        fecha,
+        producto,
+        precio_sucio_kg: precioSucio,
+        kg_origen: kgOrigen,
+        pzs_origen: pzsOrigen,
+        kg_procesado: kgProcesado,
+        pzs_procesado: pzsProcesado,
+        diferencia_kg: diferenciaKg,
+        precio_compra_total: precioCompra,
+        costo_merma: costoMerma,
+        porcentaje_merma: porcentajeMerma,
+        precio_final_limpio_kg: precioFinalLimpio,
+        origen_detalle: [...origen],
+        procesado_detalle: [...procesado],
+        observaciones: $('observaciones').value.trim()
+      };
+
+      if(guardar) programarAutosave();
+
+      return data;
+    }
+
+    function getPayloadBorrador(){
+      return {
+        client_id: CLIENT_ID,
+        fecha: $('fecha').value,
+        producto_actual: $('producto').value,
+        precio_sucio: $('precioSucio').value,
+        observaciones: $('observaciones').value,
+        capturas: state.capturas,
+        editId: state.editId,
+        updated_at_local: new Date().toISOString()
+      };
+    }
+
+    function programarAutosave(){
+      if(state.cargandoRemoto || state.cargandoInicial) return;
+
+      clearTimeout(state.autosaveTimer);
+      setAutoSave('Borrador: guardando...', 'warn');
+
+      state.autosaveTimer = setTimeout(() => {
+        guardarBorradorSupabase(false);
+      }, 700);
+    }
+
+    async function guardarBorradorSupabase(showAlert=false){
+      const fecha = $('fecha').value;
+      if(!fecha) return;
+
+      const payload = getPayloadBorrador();
+
+      try{
+        const { error } = await sb
+          .from(BORRADORES_TABLE)
+          .upsert({
+            fecha,
+            payload,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'fecha' });
+
+        if(error) throw error;
+
+        setAutoSave('Borrador guardado en Supabase', 'ok');
+        if(showAlert) alert('Borrador guardado correctamente.');
+      }catch(err){
+        console.error(err);
+        setAutoSave('Borrador: error al guardar', 'danger');
+        if(showAlert) alert('Error al guardar borrador: ' + (err.message || err));
+      }
+    }
+
+    async function cargarBorradorFecha(fecha){
+      if(!fecha) return;
+
+      try{
+        const { data, error } = await sb
+          .from(BORRADORES_TABLE)
+          .select('*')
+          .eq('fecha', fecha)
+          .maybeSingle();
+
+        if(error) throw error;
+
+        if(!data || !data.payload){
+          setAutoSave('Borrador: sin captura previa', 'info');
+          return;
+        }
+
+        aplicarPayloadBorrador(data.payload, true);
+        setAutoSave('Borrador cargado', 'ok');
+      }catch(err){
+        console.error(err);
+        setAutoSave('Borrador: error al cargar', 'danger');
+      }
+    }
+
+    function aplicarPayloadBorrador(payload, forzar=false){
+      if(!payload) return;
+      if(!forzar && payload.client_id === CLIENT_ID) return;
+
+      state.cargandoRemoto = true;
+
+      if(payload.capturas){
+        state.capturas = {
+          Menudo: payload.capturas.Menudo || { origen: [], procesado: [] },
+          Libro: payload.capturas.Libro || { origen: [], procesado: [] },
+          Pata: payload.capturas.Pata || { origen: [], procesado: [] }
+        };
+      }
+
+      if(payload.producto_actual && ['Menudo','Libro','Pata'].includes(payload.producto_actual)){
+        $('producto').value = payload.producto_actual;
+      }
+
+      if(payload.observaciones !== undefined){
+        $('observaciones').value = payload.observaciones;
+      }
+
+      if(payload.editId !== undefined){
+        state.editId = payload.editId;
+      }
+
+      updateProductLabels();
+      renderOrigen();
+      renderProcesado();
+      actualizarEstadoCaptura();
+      calcularResumen(false);
+
+      state.cargandoRemoto = false;
+    }
+
+    function activarRealtimeBorrador(fecha){
+      if(state.realtimeChannel){
+        sb.removeChannel(state.realtimeChannel);
+        state.realtimeChannel = null;
+      }
+
+      if(!fecha){
+        setRealtime('Realtime: sin fecha', 'warn');
+        return;
+      }
+
+      setRealtime('Realtime: conectando...', 'warn');
+
+      state.realtimeChannel = sb
+        .channel(`limpieza-borrador-${fecha}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: BORRADORES_TABLE,
+            filter: `fecha=eq.${fecha}`
+          },
+          (payload) => {
+            if(payload.new && payload.new.payload){
+              aplicarPayloadBorrador(payload.new.payload, false);
+              setAutoSave('Borrador actualizado en tiempo real', 'ok');
+            }
+          }
+        )
+        .subscribe((status) => {
+          if(status === 'SUBSCRIBED'){
+            setRealtime('Realtime: activo', 'ok');
+          } else if(status === 'CHANNEL_ERROR'){
+            setRealtime('Realtime: error', 'danger');
+          } else {
+            setRealtime(`Realtime: ${status}`, 'info');
+          }
+        });
+    }
+
+    function limpiarInputsOrigen(){
+      $('descOrigen').value = 'Rastro';
+      $('kgOrigen').value = '';
+      $('pzsOrigen').value = '';
+      $('kgOrigen').focus();
+    }
+
+    function limpiarInputsProcesado(){
+      $('descProcesado').value = 'Rastro';
+      $('kgProcesado').value = '';
+      $('pzsProcesado').value = '';
+      $('kgProcesado').focus();
+    }
+
+    async function nuevoLote(){
+      if(!confirm('¿Quieres limpiar la captura actual y empezar un nuevo proceso?')) return;
+
+      state.editId = null;
+      state.capturas = {
+        Menudo: { origen: [], procesado: [] },
+        Libro: { origen: [], procesado: [] },
+        Pata: { origen: [], procesado: [] }
+      };
+
+      $('fecha').value = hoyISO();
+      $('buscarFecha').value = hoyISO();
+      $('producto').value = 'Menudo';
+      $('precioSucio').value = '';
+      $('observaciones').value = '';
+      $('descOrigen').value = 'Rastro';
+      $('descProcesado').value = 'Rastro';
+
+      activarRealtimeBorrador($('fecha').value);
+      updateProductLabels();
+      renderOrigen();
+      renderProcesado();
+      actualizarEstadoCaptura();
+      calcularResumen(false);
+      await cargarPrecioAutomatico();
+      await guardarBorradorSupabase(false);
+    }
+
+    async function probarConexion(){
+      try{
+        const [{ error: errorLimpieza }, { error: errorCostos }, { error: errorBorradores }] = await Promise.all([
+          sb.from(PROCESOS_TABLE).select('id').limit(1),
+          sbCostos.from(COSTOS_FINALES_TABLE).select('fecha').limit(1),
+          sb.from(BORRADORES_TABLE).select('fecha').limit(1)
+        ]);
+
+        if(errorLimpieza) throw errorLimpieza;
+        if(errorCostos) throw errorCostos;
+        if(errorBorradores) throw errorBorradores;
+
+        setConexion(true, 'Supabase conectado');
+      }catch(err){
+        console.error(err);
+        setConexion(false, 'Error de conexión');
+      }
+    }
+
+    async function guardarEnSupabase(){
+      const data = calcularResumen(false);
+
+      if(!data.fecha){
+        alert('Captura la fecha.');
+        return;
+      }
+
+      if(!data.producto){
+        alert('Selecciona un producto.');
+        return;
+      }
+
+      if(data.precio_sucio_kg <= 0){
+        alert('No hay precio automático cargado para este producto y fecha.');
+        return;
+      }
+
+      if(data.kg_origen <= 0){
+        alert('Debes capturar kilos de origen.');
+        return;
+      }
+
+      if(data.kg_procesado <= 0){
+        alert('Debes capturar kilos procesados.');
+        return;
+      }
+
+      try{
+        let res;
+
+        if(state.editId){
+          res = await sb
+            .from(PROCESOS_TABLE)
+            .update(data)
+            .eq('id', state.editId)
+            .select()
+            .single();
+        } else {
+          res = await sb
+            .from(PROCESOS_TABLE)
+            .insert(data)
+            .select()
+            .single();
+        }
+
+        if(res.error) throw res.error;
+
+        state.editId = res.data?.id || null;
+
+        await guardarBorradorSupabase(false);
+        alert('Proceso guardado correctamente.');
+        await cargarHistorial();
+      }catch(err){
+        console.error(err);
+        alert('Error al guardar en Supabase: ' + (err.message || err));
+      }
+    }
+
+    async function cargarHistorial(){
+      try{
+        const { data, error } = await sb
+          .from(PROCESOS_TABLE)
+          .select('*')
+          .order('fecha', { ascending:false })
+          .order('id', { ascending:false })
+          .limit(50);
+
+        if(error) throw error;
+
+        state.historial = data || [];
+        renderHistorial();
+      }catch(err){
+        console.error(err);
+        $('tbodyHistorial').innerHTML = `<tr><td colspan="7" class="empty">No se pudo cargar el historial.</td></tr>`;
+      }
+    }
+
+    async function buscarPorFecha(){
+      const fecha = $('buscarFecha').value;
+      if(!fecha){
+        alert('Selecciona una fecha para buscar.');
+        return;
+      }
+
+      try{
+        const { data, error } = await sb
+          .from(PROCESOS_TABLE)
+          .select('*')
+          .eq('fecha', fecha)
+          .order('id', { ascending:false });
+
+        if(error) throw error;
+
+        state.historial = data || [];
+        renderHistorial();
+
+        $('fecha').value = fecha;
+        activarRealtimeBorrador(fecha);
+        await cargarBorradorFecha(fecha);
+        await cargarPrecioAutomatico();
+      }catch(err){
+        console.error(err);
+        alert('Error al buscar por fecha: ' + (err.message || err));
+      }
+    }
+
+    async function cargarHoy(){
+      $('buscarFecha').value = hoyISO();
+      await buscarPorFecha();
+    }
+
+    function renderHistorial(){
+      $('countHistorial').textContent = `${state.historial.length} registro${state.historial.length===1?'':'s'}`;
+
+      if(!state.historial.length){
+        $('tbodyHistorial').innerHTML = `<tr><td colspan="7" class="empty">Sin registros todavía.</td></tr>`;
+        return;
+      }
+
+      $('tbodyHistorial').innerHTML = state.historial.map(row => `
+        <tr>
+          <td>${row.fecha || '—'}</td>
+          <td>${row.producto || '—'}</td>
+          <td class="num">${fmtNum(row.kg_origen)}</td>
+          <td class="num">${fmtNum(row.kg_procesado)}</td>
+          <td class="num">${fmtNum(row.porcentaje_merma)}%</td>
+          <td class="num">${fmtMoney(row.precio_final_limpio_kg)}</td>
+          <td><button class="btn-soft" type="button" onclick="cargarRegistro(${row.id})">Abrir</button></td>
+        </tr>
+      `).join('');
+    }
+
+    function generarResumenWhatsapp(){
+  const fecha = $('fecha').value || '—';
+  const producto = productoActual();
+
+  const origen = state.capturas[producto]?.origen || [];
+  const procesado = state.capturas[producto]?.procesado || [];
+
+  const kgOrigen = totalKg(origen);
+  const pzsOrigen = totalPzs(origen);
+  const kgProcesado = totalKg(procesado);
+  const pzsProcesado = totalPzs(procesado);
+
+  const precioSucio = safeNum($('precioSucio').value);
+
+  const diferenciaKg = Math.max(kgOrigen - kgProcesado, 0);
+  const precioCompra = kgOrigen * precioSucio;
+  const costoMerma = diferenciaKg * precioSucio;
+  const porcentajeMerma = kgOrigen > 0 ? (diferenciaKg / kgOrigen) * 100 : 0;
+  const precioFinalLimpio = kgProcesado > 0 ? (precioCompra / kgProcesado) : 0;
+
+  let mensaje = `*RESUMEN INDIVIDUAL DE LIMPIEZA — VDC 360°*\n`;
+  mensaje += `Fecha: ${fecha}\n`;
+  mensaje += `Producto: *${producto}*\n\n`;
+
+  mensaje += `*SUCIO ENVIADO A LIMPIEZA*\n`;
+  mensaje += `Piezas: ${fmtNum(pzsOrigen,0)} pzas\n`;
+  mensaje += `Peso: ${fmtNum(kgOrigen)} kg\n\n`;
+
+  mensaje += `*LIMPIO RECIBIDO*\n`;
+  mensaje += `Piezas: ${fmtNum(pzsProcesado,0)} pzas\n`;
+  mensaje += `Peso: ${fmtNum(kgProcesado)} kg\n\n`;
+
+  mensaje += `*CÁLCULO DEL PROCESO*\n`;
+  mensaje += `Precio kg sucio: ${precioSucio > 0 ? fmtMoney(precioSucio) : 'Pendiente'}\n`;
+  mensaje += `Diferencia / merma: ${fmtNum(diferenciaKg)} kg\n`;
+  mensaje += `Precio compra total: ${precioSucio > 0 ? fmtMoney(precioCompra) : 'Pendiente'}\n`;
+  mensaje += `Costo de merma: ${precioSucio > 0 ? fmtMoney(costoMerma) : 'Pendiente'}\n`;
+  mensaje += `% merma: ${fmtNum(porcentajeMerma)}%\n`;
+  mensaje += `Precio final limpio por kg: ${precioSucio > 0 && kgProcesado > 0 ? fmtMoney(precioFinalLimpio) : 'Pendiente'}\n\n`;
+
+  const obs = $('observaciones').value.trim();
+  if(obs){
+    mensaje += `*Observaciones:*\n${obs}\n\n`;
+  }
+
+  mensaje += `— Carnes y Vísceras del Centro`;
+
+  return mensaje;
+}
+
+   function enviarResumenWhatsapp(){
+  const producto = productoActual();
+  const origen = state.capturas[producto]?.origen || [];
+  const procesado = state.capturas[producto]?.procesado || [];
+
+  if(!origen.length && !procesado.length){
+    alert(`No hay capturas para enviar de ${producto}.`);
+    return;
+  }
+
+  const mensaje = generarResumenWhatsapp();
+  const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(mensaje)}`;
+  window.open(url, '_blank');
+}
+
+    window.eliminarOrigen = function(index){
+      origenActual().splice(index, 1);
+      renderOrigen();
+      calcularResumen();
+    };
+
+    window.eliminarProcesado = function(index){
+      procesadoActual().splice(index, 1);
+      renderProcesado();
+      calcularResumen();
+    };
+
+    $('btnAgregarOrigen').addEventListener('click', () => {
+      const desc = $('descOrigen').value;
+      const kg = safeNum($('kgOrigen').value);
+      const pzs = safeNum($('pzsOrigen').value);
+      const producto = productoActual();
+
+      if(kg <= 0 && pzs <= 0){
+        alert('Captura kilos o piezas en origen.');
+        return;
+      }
+
+      state.capturas[producto].origen.push({
+        producto,
+        desc: desc || 'Rastro',
+        kg,
+        pzs
+      });
+
+      renderOrigen();
+      calcularResumen();
+      limpiarInputsOrigen();
+    });
+
+    $('btnAgregarProcesado').addEventListener('click', () => {
+      const desc = $('descProcesado').value;
+      const kg = safeNum($('kgProcesado').value);
+      const pzs = safeNum($('pzsProcesado').value);
+      const producto = productoActual();
+
+      if(kg <= 0 && pzs <= 0){
+        alert('Captura kilos o piezas en procesado.');
+        return;
+      }
+
+      state.capturas[producto].procesado.push({
+        producto,
+        desc: desc || 'Rastro',
+        kg,
+        pzs
+      });
+
+      renderProcesado();
+      calcularResumen();
+      limpiarInputsProcesado();
+    });
+
+    $('btnGuardarSupabase').addEventListener('click', guardarEnSupabase);
+    $('btnGuardarBorrador').addEventListener('click', () => guardarBorradorSupabase(true));
+    $('btnNuevo').addEventListener('click', nuevoLote);
+    $('btnBuscarFecha').addEventListener('click', buscarPorFecha);
+    $('btnCargarHoy').addEventListener('click', cargarHoy);
+    $('btnWhatsappResumen').addEventListener('click', enviarResumenWhatsapp);
+
+    $('producto').addEventListener('change', async () => {
+      updateProductLabels();
+      await cargarPrecioAutomatico();
+      calcularResumen();
+    });
+
+    $('fecha').addEventListener('change', async () => {
+      const fecha = $('fecha').value;
+      $('buscarFecha').value = fecha;
+      activarRealtimeBorrador(fecha);
+      await cargarBorradorFecha(fecha);
+      await cargarPrecioAutomatico();
+      calcularResumen();
+    });
+
+    $('observaciones').addEventListener('input', () => calcularResumen());
+
+    ['kgOrigen','pzsOrigen'].forEach(id => {
+      $(id).addEventListener('keydown', (e) => {
+        if(e.key === 'Enter'){
+          e.preventDefault();
+          $('btnAgregarOrigen').click();
+        }
+      });
+    });
+
+    ['kgProcesado','pzsProcesado'].forEach(id => {
+      $(id).addEventListener('keydown', (e) => {
+        if(e.key === 'Enter'){
+          e.preventDefault();
+          $('btnAgregarProcesado').click();
+        }
+      });
+    });
+
+    window.addEventListener('beforeunload', () => {
+      if(!state.cargandoInicial){
+        const payload = getPayloadBorrador();
+        const fecha = $('fecha').value;
+        if(fecha){
+          navigator.sendBeacon?.(
+            `${SUPABASE_URL}/rest/v1/${BORRADORES_TABLE}`,
+            JSON.stringify({
+              fecha,
+              payload,
+              updated_at: new Date().toISOString()
+            })
+          );
+        }
+      }
+    });
+
+    window.addEventListener('load', async () => {
+      $('fecha').value = hoyISO();
+      $('buscarFecha').value = hoyISO();
+      $('descOrigen').value = 'Rastro';
+      $('descProcesado').value = 'Rastro';
+
+      updateProductLabels();
+      renderOrigen();
+      renderProcesado();
+      actualizarEstadoCaptura();
+      calcularResumen(false);
+
+      await probarConexion();
+      activarRealtimeBorrador($('fecha').value);
+      await cargarBorradorFecha($('fecha').value);
+      await cargarPrecioAutomatico();
+      await cargarHistorial();
+
+      state.cargandoInicial = false;
+      setAutoSave('Borrador listo', 'ok');
+    });
+  </script>
+</body>
+</html>
