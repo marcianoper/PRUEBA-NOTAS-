@@ -255,21 +255,85 @@
       }
     }
 
-    function linea80(){ return "--------------------------------\n"; }
+    // ===== FORMATO IMPRESORA 80 x 210 mm =====
+    // Esta impresora usa hoja/ticket fijo, no rollo infinito.
+    // Por eso se controla ancho, saltos y cantidad de líneas.
+    const TICKET_80_ANCHO = 32;
+    const TICKET_80_MAX_LINEAS = 42;
+
+    function limpiarTextoImpresora(txt){
+      return String(txt || "")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[📦📅👤🧮🟢🔴✅↵]/g, "")
+        .replace(/[“”]/g, '"')
+        .replace(/[‘’]/g, "'")
+        .replace(/[–—]/g, "-")
+        .replace(/\*/g, "")
+        .replace(/[^\x09\x0A\x0D\x20-\x7EñÑ]/g, "")
+        .trim();
+    }
+
+    function linea80(){ return "-".repeat(TICKET_80_ANCHO) + "\n"; }
+
+    function cortarLinea(linea, ancho=TICKET_80_ANCHO){
+      linea = limpiarTextoImpresora(linea).replace(/\s+/g, " ").trim();
+      if(!linea) return [""];
+      const out = [];
+      while(linea.length > ancho){
+        let cut = linea.lastIndexOf(" ", ancho);
+        if(cut < Math.floor(ancho * .55)) cut = ancho;
+        out.push(linea.slice(0, cut).trim());
+        linea = linea.slice(cut).trim();
+      }
+      if(linea) out.push(linea);
+      return out;
+    }
+
+    function centrarLinea(linea, ancho=TICKET_80_ANCHO){
+      linea = limpiarTextoImpresora(linea);
+      if(linea.length >= ancho) return linea.slice(0, ancho);
+      const left = Math.floor((ancho - linea.length) / 2);
+      return " ".repeat(left) + linea;
+    }
 
     function centrarTexto(txt){
-      const width = 32;
-      txt = String(txt || "");
-      if(txt.length >= width) return txt + "\n";
-      const left = Math.floor((width - txt.length) / 2);
-      return " ".repeat(left) + txt + "\n";
+      return cortarLinea(txt).map(l => centrarLinea(l)).join("\n") + "\n";
     }
 
     function normalizarTicketTexto(txt){
       return String(txt || "")
         .replace(/\r\n/g, "\n")
         .replace(/\r/g, "\n")
+        .split("\n")
+        .flatMap(linea => cortarLinea(linea))
+        .join("\n")
         .trim();
+    }
+
+    function ajustarTicket80x210(ticket){
+      let lineas = String(ticket || "").replace(/\r\n/g,"\n").replace(/\r/g,"\n").split("\n");
+      lineas = lineas.map(l => limpiarTextoImpresora(l).slice(0, TICKET_80_ANCHO));
+
+      // Quita exceso de líneas vacías consecutivas para evitar ticket largo.
+      const limpias = [];
+      for(const l of lineas){
+        const prev = limpias[limpias.length - 1];
+        if(l === "" && prev === "") continue;
+        limpias.push(l);
+      }
+
+      if(limpias.length > TICKET_80_MAX_LINEAS){
+        limpias.length = TICKET_80_MAX_LINEAS - 2;
+        limpias.push("...");
+        limpias.push("CONTINUA EN SISTEMA");
+      }
+
+      // Pequeño margen final: suficiente para corte, sin alargar de más.
+      return limpias.join("\n").trimEnd() + "\n\n";
+    }
+
+    async function imprimirTicket80x210(ticket){
+      return await imprimirSilenciosoTexto(ajustarTicket80x210(ticket));
     }
 
     // ========= COMPAT: replaceAll =========
@@ -607,14 +671,12 @@
         centrarTexto("FECHA: " + fecha) +
         linea80() +
         centrarTexto("DIO SEBO") +
-        "\n" +
         centrarTexto(kg.toFixed(2) + " KG") +
-        "\n" +
         linea80() +
-        "FIRMA: ______________________\n\n\n";
+        "FIRMA: ____________________\n";
 
       if(USAR_IMPRESION_SILENCIOSA){
-        const ok = await imprimirSilenciosoTexto(ticket);
+        const ok = await imprimirTicket80x210(ticket);
         if(ok) vdcDraftSave();
         return;
       }
@@ -625,7 +687,7 @@
       <style>
         body{margin:0;font-family:ui-monospace,Menlo,Consolas,monospace}
         #t{width:80mm;padding:2mm;white-space:pre-wrap}
-        @media print{@page{size:80mm auto;margin:0}}
+        @media print{@page{size:80mm 210mm;margin:0}}
       </style></head><body><div id="t">${escapeHtml(ticket)}</div></body></html>`;
 
       printHtmlWindow(html);
@@ -645,17 +707,14 @@
         centrarTexto(STORE) +
         centrarTexto("FECHA: " + fecha) +
         linea80() +
-        "\n" +
         cuerpo.split("\n").map(linea => centrarTexto(linea.trim())).join("") +
-        "\n" +
         linea80() +
-        centrarTexto("Etiqueta / Señalamiento") +
-        "\n\n";
+        centrarTexto("Etiqueta / Senalamiento");
 
       if(USAR_IMPRESION_SILENCIOSA){
         let impresas = 0;
         for(let i = 0; i < copias; i++){
-          const ok = await imprimirSilenciosoTexto(ticket);
+          const ok = await imprimirTicket80x210(ticket);
           if(ok) impresas++;
           else break;
         }
@@ -673,7 +732,7 @@
       <style>
         body{margin:0;font-family:ui-monospace,Menlo,Consolas,monospace}
         #t{width:80mm;padding:2mm;white-space:pre-wrap;text-align:center}
-        @media print{@page{size:80mm auto;margin:0}}
+        @media print{@page{size:80mm 210mm;margin:0}}
       </style></head><body><div id="t">${escapeHtml(ticket)}</div></body></html>`;
 
       const win = window.open('', '_blank', 'width=420,height=650');
@@ -843,11 +902,9 @@
         normalizarTicketTexto(msg)
           .replace(/📦|📅|👤|🧮/g, "")
           .replace(/\*/g, "") +
-        "\n" +
-        linea80() +
-        "\n\n";
+        linea80();
 
-      const ok = await imprimirSilenciosoTexto(ticket);
+      const ok = await imprimirTicket80x210(ticket);
       if(ok) vdcDraftSave();
     }
 
