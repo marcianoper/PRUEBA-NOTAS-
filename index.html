@@ -107,6 +107,7 @@
     <div class="hr"></div>
 
     <h2 style="margin:0;">Papel de sebo 80mm</h2>
+    <div class="hint"><b>Modo impresión:</b> texto plano compacto para hoja fija 80 x 210 mm.</div>
     <div class="row">
       <div>
         <label for="seboKg">Kilos de sebo (DIO SEBO):</label>
@@ -114,6 +115,7 @@
       </div>
       <div style="flex:0 0 auto;">
         <button onclick="imprimirSebo80mm()">Imprimir papel de sebo 80mm</button>
+        <button class="btn-gray" type="button" onclick="imprimirPrueba80x210()">Prueba 80x210</button>
       </div>
     </div>
 
@@ -235,10 +237,26 @@
 
     async function imprimirSilenciosoTexto(texto){
       try{
+        // IMPORTANTE:
+        // Esta impresora usa hoja fija Printer Paper 80 x 210 mm.
+        // Se manda texto plano corto y parametros de hoja para que el servidor
+        // local NO lo renderice como ticket largo/infinito.
+        const payload = {
+          texto: String(texto || "").trimEnd() + "\n\f",
+          ancho_mm: 80,
+          alto_mm: 210,
+          paper_width_mm: 80,
+          paper_height_mm: 210,
+          formato: "80x210",
+          font_size: 11,
+          line_height: 1.05,
+          margin_mm: 3
+        };
+
         const res = await fetch(IMPRESION_SILENCIOSA_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ texto })
+          body: JSON.stringify(payload)
         });
 
         const data = await res.json();
@@ -258,8 +276,8 @@
     // ===== FORMATO IMPRESORA 80 x 210 mm =====
     // Esta impresora usa hoja/ticket fijo, no rollo infinito.
     // Por eso se controla ancho, saltos y cantidad de líneas.
-    const TICKET_80_ANCHO = 32;
-    const TICKET_80_MAX_LINEAS = 42;
+    const TICKET_80_ANCHO = 24;
+    const TICKET_80_MAX_LINEAS = 22;
 
     function limpiarTextoImpresora(txt){
       return String(txt || "")
@@ -658,6 +676,19 @@
       setTimeout(() => win.print(), 300);
     }
 
+
+    async function imprimirPrueba80x210(){
+      const ticket =
+        centrarTexto("PRUEBA 80 X 210") +
+        linea80() +
+        "Linea 1\n" +
+        "Linea 2\n" +
+        "Linea 3\n" +
+        linea80() +
+        centrarTexto("FIN");
+      await imprimirTicket80x210(ticket);
+    }
+
     async function imprimirSebo80mm() {
       const kg = Number(document.getElementById('seboKg').value || 0);
       if (!kg || kg <= 0) return alert("Ingresa los kilos de sebo.");
@@ -962,6 +993,7 @@
     // ========= EXPONER =========
     window.guardarViaje = guardarViaje;
     window.generarDocumento = generarDocumento;
+    window.imprimirPrueba80x210 = imprimirPrueba80x210;
     window.imprimirSebo80mm = imprimirSebo80mm;
     window.imprimirEtiqueta80mm = imprimirEtiqueta80mm;
     window.limpiarEtiqueta = limpiarEtiqueta;
