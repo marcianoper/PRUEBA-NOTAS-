@@ -215,6 +215,9 @@
         <button class="btn-gray" onclick="abrirWhatsApp()">Abrir WhatsApp</button>
       </div>
       <div style="flex:0 0 auto;">
+        <button class="btn-teal" onclick="imprimirMensajePesajes()">Imprimir mensaje local</button>
+      </div>
+      <div style="flex:0 0 auto;">
         <button class="btn-red" onclick="limpiarPesajes()">Limpiar todo</button>
       </div>
     </div>
@@ -226,6 +229,49 @@
   </div>
 
   <script>
+    // 🔥 IMPRESIÓN SILENCIOSA VDC
+    const IMPRESION_SILENCIOSA_URL = "http://192.168.1.84:5050/imprimir";
+    const USAR_IMPRESION_SILENCIOSA = true;
+
+    async function imprimirSilenciosoTexto(texto){
+      try{
+        const res = await fetch(IMPRESION_SILENCIOSA_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ texto })
+        });
+
+        const data = await res.json();
+
+        if(!data.ok){
+          throw new Error(data.error || "Error desconocido");
+        }
+
+        return true;
+      }catch(err){
+        console.error(err);
+        alert("No se pudo imprimir silenciosamente. Verifica que el programa de impresión local esté abierto.");
+        return false;
+      }
+    }
+
+    function linea80(){ return "--------------------------------\n"; }
+
+    function centrarTexto(txt){
+      const width = 32;
+      txt = String(txt || "");
+      if(txt.length >= width) return txt + "\n";
+      const left = Math.floor((width - txt.length) / 2);
+      return " ".repeat(left) + txt + "\n";
+    }
+
+    function normalizarTicketTexto(txt){
+      return String(txt || "")
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .trim();
+    }
+
     // ========= COMPAT: replaceAll =========
     (function(){
       if (!String.prototype.replaceAll) {
@@ -548,68 +594,87 @@
       setTimeout(() => win.print(), 300);
     }
 
-    function imprimirSebo80mm() {
+    async function imprimirSebo80mm() {
       const kg = Number(document.getElementById('seboKg').value || 0);
       if (!kg || kg <= 0) return alert("Ingresa los kilos de sebo.");
 
       const STORE = "Carnes y Vísceras del Centro";
       const fecha = fechaMX();
 
+      const ticket =
+        centrarTexto(STORE) +
+        centrarTexto("PAPEL DE SEBO") +
+        centrarTexto("FECHA: " + fecha) +
+        linea80() +
+        centrarTexto("DIO SEBO") +
+        "\n" +
+        centrarTexto(kg.toFixed(2) + " KG") +
+        "\n" +
+        linea80() +
+        "FIRMA: ______________________\n\n\n";
+
+      if(USAR_IMPRESION_SILENCIOSA){
+        const ok = await imprimirSilenciosoTexto(ticket);
+        if(ok) vdcDraftSave();
+        return;
+      }
+
+      // Fallback anterior si algún día se desactiva la impresión silenciosa.
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <style>
         body{margin:0;font-family:ui-monospace,Menlo,Consolas,monospace}
-        #t{width:80mm;padding:2mm}
-        h3{margin:0;text-align:center;font-size:14px}
-        .c{text-align:center;font-size:11px;margin-top:4px}
-        .line{border-top:1px dashed #000;margin:6px 0}
-        .big{text-align:center;font-weight:800;font-size:16px}
-        .amt{text-align:center;font-weight:900;font-size:20px;margin-top:4px}
+        #t{width:80mm;padding:2mm;white-space:pre-wrap}
         @media print{@page{size:80mm auto;margin:0}}
-      </style></head><body>
-        <div id="t">
-          <h3>${STORE}</h3>
-          <div class="c">PAPEL DE SEBO<br>FECHA: ${fecha}</div>
-          <div class="line"></div>
-          <div class="big">DIO SEBO</div>
-          <div class="amt">${kg.toFixed(2)} KG</div>
-          <div class="line"></div>
-          <div class="c">FIRMA: ____________________________</div>
-        </div>
-      </body></html>`;
+      </style></head><body><div id="t">${escapeHtml(ticket)}</div></body></html>`;
 
       printHtmlWindow(html);
       vdcDraftSave();
     }
 
-    function imprimirEtiqueta80mm() {
+    async function imprimirEtiqueta80mm() {
       const texto = (document.getElementById('etiquetaTexto').value || '').trim();
       const copias = Math.max(1, parseInt(document.getElementById('etqCopias').value || '1', 10));
       if (!texto) return alert("Escribe el texto de la etiqueta.");
 
       const STORE = "Carnes y Vísceras del Centro";
       const fecha = fechaMX();
+      const cuerpo = normalizarTicketTexto(texto);
 
-      const safe = escapeHtml(texto).replaceAll('\n','<br>');
+      const ticket =
+        centrarTexto(STORE) +
+        centrarTexto("FECHA: " + fecha) +
+        linea80() +
+        "\n" +
+        cuerpo.split("\n").map(linea => centrarTexto(linea.trim())).join("") +
+        "\n" +
+        linea80() +
+        centrarTexto("Etiqueta / Señalamiento") +
+        "\n\n";
 
+      if(USAR_IMPRESION_SILENCIOSA){
+        let impresas = 0;
+        for(let i = 0; i < copias; i++){
+          const ok = await imprimirSilenciosoTexto(ticket);
+          if(ok) impresas++;
+          else break;
+        }
+
+        if(impresas > 0){
+          vdcDraftSave();
+          if(copias > 1) alert(`✅ Etiqueta enviada a impresión (${impresas}/${copias} copias).`);
+        }
+        return;
+      }
+
+      // Fallback anterior si algún día se desactiva la impresión silenciosa.
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <style>
         body{margin:0;font-family:ui-monospace,Menlo,Consolas,monospace}
-        #t{width:80mm;padding:2mm}
-        .c{text-align:center;font-size:10px}
-        .line{border-top:1px dashed #000;margin:6px 0}
-        .body{text-align:center;font-weight:900;font-size:18px;line-height:1.15;word-break:break-word}
+        #t{width:80mm;padding:2mm;white-space:pre-wrap;text-align:center}
         @media print{@page{size:80mm auto;margin:0}}
-      </style></head><body>
-        <div id="t">
-          <div class="c"><b>${STORE}</b><br>FECHA: ${fecha}</div>
-          <div class="line"></div>
-          <div class="body">${safe}</div>
-          <div class="line"></div>
-          <div class="c">Etiqueta / Señalamiento</div>
-        </div>
-      </body></html>`;
+      </style></head><body><div id="t">${escapeHtml(ticket)}</div></body></html>`;
 
       const win = window.open('', '_blank', 'width=420,height=650');
       if (!win) {
@@ -768,6 +833,24 @@
       vdcDraftSave();
     }
 
+    async function imprimirMensajePesajes(){
+      const msg = generarMensaje();
+      if(!msg) return;
+
+      const ticket =
+        centrarTexto("Carnes y Vísceras del Centro") +
+        linea80() +
+        normalizarTicketTexto(msg)
+          .replace(/📦|📅|👤|🧮/g, "")
+          .replace(/\*/g, "") +
+        "\n" +
+        linea80() +
+        "\n\n";
+
+      const ok = await imprimirSilenciosoTexto(ticket);
+      if(ok) vdcDraftSave();
+    }
+
     function limpiarPesajes(){
       pesajes = [];
       document.getElementById('whatsNumero').value = '';
@@ -831,6 +914,7 @@
     window.generarMensaje = generarMensaje;
     window.copiarMensaje = copiarMensaje;
     window.abrirWhatsApp = abrirWhatsApp;
+    window.imprimirMensajePesajes = imprimirMensajePesajes;
     window.limpiarPesajes = limpiarPesajes;
 
     // ========= ARRANQUE =========
