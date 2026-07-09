@@ -62,6 +62,44 @@
 
     /* Solo se ve cuando eliges "Producto libre" */
     #prodNombreWrap{ display:none; }
+
+    .pedido-preview{
+      margin-top:12px;
+      background:#f9fafb;
+      border:1px solid #e5e7eb;
+      border-radius:12px;
+      padding:12px;
+      overflow:auto;
+      display:none;
+    }
+    .pedido-grid{
+      display:grid;
+      gap:8px;
+      align-items:stretch;
+    }
+    .pedido-card{
+      border:2px solid #111;
+      border-radius:8px;
+      padding:8px;
+      background:#fff;
+      min-height:120px;
+    }
+    .pedido-card .cliente{
+      font-size:20px;
+      font-weight:900;
+      text-align:center;
+      border-bottom:2px solid #111;
+      padding-bottom:5px;
+      margin-bottom:7px;
+      text-transform:uppercase;
+    }
+    .pedido-card .items{
+      font-size:17px;
+      font-weight:900;
+      line-height:1.28;
+      white-space:pre-line;
+      text-align:center;
+    }
   </style>
 </head>
 
@@ -139,6 +177,40 @@
         <button class="btn-gray" onclick="limpiarEtiqueta()">Limpiar</button>
       </div>
     </div>
+
+    <div class="hr"></div>
+
+    <h2 style="margin:0;">Pedidos 80mm</h2>
+    <div class="hint">Pega el pedido completo de WhatsApp. El sistema detecta cada cliente y los acomoda horizontalmente en columnas.</div>
+
+    <label for="pedidoTexto">Texto del pedido:</label>
+    <textarea id="pedidoTexto" placeholder="Pega aquí el pedido completo. Ej: DAVID, productos debajo, espacio, NACHO..."></textarea>
+
+    <div class="row">
+      <div>
+        <label for="pedidoColumnas">Clientes por fila:</label>
+        <select id="pedidoColumnas">
+          <option value="2">2 columnas</option>
+          <option value="3" selected>3 columnas</option>
+          <option value="4">4 columnas</option>
+        </select>
+      </div>
+      <div>
+        <label for="pedidoCopias">Copias:</label>
+        <input type="number" id="pedidoCopias" min="1" step="1" value="1" />
+      </div>
+      <div style="flex:0 0 auto;">
+        <button class="btn-teal" onclick="previsualizarPedidos()">Vista previa</button>
+      </div>
+      <div style="flex:0 0 auto;">
+        <button onclick="imprimirPedidos80mm()">Imprimir pedidos 80mm</button>
+      </div>
+      <div style="flex:0 0 auto;">
+        <button class="btn-gray" onclick="limpiarPedidos()">Limpiar</button>
+      </div>
+    </div>
+
+    <div id="pedidoPreview" class="pedido-preview"></div>
 
     <div class="hr"></div>
 
@@ -378,6 +450,9 @@
           seboKg: document.getElementById('seboKg')?.value || '',
           etiquetaTexto: document.getElementById('etiquetaTexto')?.value || '',
           etqCopias: document.getElementById('etqCopias')?.value || '1',
+          pedidoTexto: document.getElementById('pedidoTexto')?.value || '',
+          pedidoColumnas: document.getElementById('pedidoColumnas')?.value || '3',
+          pedidoCopias: document.getElementById('pedidoCopias')?.value || '1',
           origenTipo: document.getElementById('origenTipo')?.value || '',
           prodSelect: document.getElementById('prodSelect')?.value || '',
           prodNombre: document.getElementById('prodNombre')?.value || '',
@@ -402,6 +477,9 @@
       setVal('seboKg', f.seboKg);
       setVal('etiquetaTexto', f.etiquetaTexto);
       setVal('etqCopias', f.etqCopias);
+      setVal('pedidoTexto', f.pedidoTexto);
+      setVal('pedidoColumnas', f.pedidoColumnas || '3');
+      setVal('pedidoCopias', f.pedidoCopias || '1');
       setVal('origenTipo', f.origenTipo);
 
       // Llenar productos según origen antes de setear selección
@@ -455,6 +533,11 @@
       document.getElementById('seboKg').value = '';
       document.getElementById('etiquetaTexto').value = '';
       document.getElementById('etqCopias').value = 1;
+      document.getElementById('pedidoTexto').value = '';
+      document.getElementById('pedidoColumnas').value = '3';
+      document.getElementById('pedidoCopias').value = 1;
+      document.getElementById('pedidoPreview').style.display = 'none';
+      document.getElementById('pedidoPreview').innerHTML = '';
 
       document.getElementById('origenTipo').value = '';
       fillProductoOptions('');
@@ -726,6 +809,134 @@
       scheduleDraft();
     }
 
+    // ========= PEDIDOS 80MM =========
+    function parsePedidosTexto(texto){
+      const lineas = String(texto || '')
+        .replaceAll('\r','')
+        .split('\n')
+        .map(x => x.trim())
+        .filter(x => x.length > 0);
+
+      const pedidos = [];
+      let actual = null;
+
+      lineas.forEach(linea => {
+        // Si la línea no empieza con número, se toma como nombre de cliente.
+        // Ej: DAVID, NACHO, VILLA.
+        if(!/^\d+(\.\d+)?\s+/i.test(linea)){
+          if(actual) pedidos.push(actual);
+          actual = { cliente: linea.toUpperCase(), items: [] };
+        }else{
+          if(!actual){
+            actual = { cliente: 'PEDIDO', items: [] };
+          }
+          actual.items.push(linea.toUpperCase());
+        }
+      });
+
+      if(actual) pedidos.push(actual);
+      return pedidos.filter(p => p.cliente && p.items.length > 0);
+    }
+
+    function buildPedidoGridHtml(pedidos, columnas){
+      const cols = Math.min(4, Math.max(1, parseInt(columnas || 3, 10)));
+      let html = `<div class="pedido-grid" style="grid-template-columns:repeat(${cols}, minmax(0, 1fr));">`;
+      pedidos.forEach(p => {
+        html += `
+          <div class="pedido-card">
+            <div class="cliente">${escapeHtml(p.cliente)}</div>
+            <div class="items">${p.items.map(escapeHtml).join('<br>')}</div>
+          </div>`;
+      });
+      html += `</div>`;
+      return html;
+    }
+
+    function previsualizarPedidos(){
+      const texto = (document.getElementById('pedidoTexto').value || '').trim();
+      const columnas = document.getElementById('pedidoColumnas').value || '3';
+      if(!texto) return alert('Pega el texto del pedido.');
+
+      const pedidos = parsePedidosTexto(texto);
+      if(pedidos.length === 0) return alert('No detecté pedidos. Revisa que cada cliente tenga su nombre y debajo sus productos.');
+
+      const box = document.getElementById('pedidoPreview');
+      box.innerHTML = buildPedidoGridHtml(pedidos, columnas);
+      box.style.display = 'block';
+      vdcDraftSave();
+      return pedidos;
+    }
+
+    function buildPedidos80mmHtml(pedidos, columnas){
+      const cols = Math.min(4, Math.max(1, parseInt(columnas || 3, 10)));
+      const fecha = fechaMX();
+      const cards = pedidos.map(p => `
+        <div class="pedido-card">
+          <div class="cliente">${escapeHtml(p.cliente)}</div>
+          <div class="items">${p.items.map(escapeHtml).join('<br>')}</div>
+        </div>`).join('');
+
+      return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Pedidos 80mm</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#fff;color:#000;font-family:Arial, Helvetica, sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  #ticket{width:80mm;max-width:80mm;margin:0;padding:2mm;background:#fff;}
+  .head{text-align:center;font-weight:900;font-size:12px;margin-bottom:2mm;line-height:1.15;}
+  .fecha{font-size:10px;font-weight:700;}
+  .pedido-grid{display:grid;grid-template-columns:repeat(${cols}, 1fr);gap:1.5mm;align-items:stretch;}
+  .pedido-card{border:1.5px solid #000;border-radius:2mm;padding:1.5mm;min-height:34mm;page-break-inside:avoid;break-inside:avoid;}
+  .cliente{text-align:center;font-size:${cols >= 4 ? '10px' : '12px'};font-weight:900;border-bottom:1.5px solid #000;padding-bottom:1mm;margin-bottom:1mm;text-transform:uppercase;line-height:1.1;}
+  .items{text-align:center;font-size:${cols >= 4 ? '10px' : '12px'};font-weight:900;line-height:1.25;}
+  @media print{
+    @page{ size:80mm auto; margin:0; }
+    body{margin:0;}
+    #ticket{width:76mm;max-width:80mm;padding:2mm;}
+  }
+</style>
+</head>
+<body>
+  <div id="ticket">
+    <div class="head">PEDIDOS<br><span class="fecha">${fecha}</span></div>
+    <div class="pedido-grid">${cards}</div>
+  </div>
+</body>
+</html>`;
+    }
+
+    function imprimirPedidos80mm(){
+      const texto = (document.getElementById('pedidoTexto').value || '').trim();
+      const columnas = document.getElementById('pedidoColumnas').value || '3';
+      const copias = Math.max(1, parseInt(document.getElementById('pedidoCopias').value || '1', 10));
+      if(!texto) return alert('Pega el texto del pedido.');
+
+      const pedidos = parsePedidosTexto(texto);
+      if(pedidos.length === 0) return alert('No detecté pedidos. Revisa que cada cliente tenga su nombre y debajo sus productos.');
+
+      const html = buildPedidos80mmHtml(pedidos, columnas);
+      document.getElementById('pedidoPreview').innerHTML = buildPedidoGridHtml(pedidos, columnas);
+      document.getElementById('pedidoPreview').style.display = 'block';
+
+      if(USAR_IMPRESION_SILENCIOSA){
+        imprimirSilenciosoHtml(html, copias);
+      }else{
+        printHtmlWindow(html);
+      }
+      vdcDraftSave();
+    }
+
+    function limpiarPedidos(){
+      document.getElementById('pedidoTexto').value = '';
+      document.getElementById('pedidoColumnas').value = '3';
+      document.getElementById('pedidoCopias').value = 1;
+      document.getElementById('pedidoPreview').style.display = 'none';
+      document.getElementById('pedidoPreview').innerHTML = '';
+      scheduleDraft();
+    }
+
     // ========= PESAJES =========
     function getSelectedProducto(){
       const selVal = (document.getElementById('prodSelect').value || '').trim();
@@ -913,6 +1124,9 @@
     window.imprimirEtiqueta80mm = imprimirEtiqueta80mm;
     window.imprimirMensajePesajes80mm = imprimirMensajePesajes80mm;
     window.limpiarEtiqueta = limpiarEtiqueta;
+    window.previsualizarPedidos = previsualizarPedidos;
+    window.imprimirPedidos80mm = imprimirPedidos80mm;
+    window.limpiarPedidos = limpiarPedidos;
 
     window.agregarLinea = agregarLinea;
     window.eliminarLinea = eliminarLinea;
