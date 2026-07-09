@@ -85,7 +85,7 @@
       min-height:120px;
     }
     .pedido-card .cliente{
-      font-size:20px;
+      font-size:26px;
       font-weight:900;
       text-align:center;
       border-bottom:2px solid #111;
@@ -94,7 +94,7 @@
       text-transform:uppercase;
     }
     .pedido-card .items{
-      font-size:17px;
+      font-size:22px;
       font-weight:900;
       line-height:1.28;
       white-space:pre-line;
@@ -193,6 +193,14 @@
           <option value="2">2 columnas</option>
           <option value="3" selected>3 columnas</option>
           <option value="4">4 columnas</option>
+        </select>
+      </div>
+      <div>
+        <label for="pedidoTamano">Tamaño de letra:</label>
+        <select id="pedidoTamano">
+          <option value="normal">Normal</option>
+          <option value="grande" selected>Grande</option>
+          <option value="extra">Extra grande</option>
         </select>
       </div>
       <div>
@@ -452,6 +460,7 @@
           etqCopias: document.getElementById('etqCopias')?.value || '1',
           pedidoTexto: document.getElementById('pedidoTexto')?.value || '',
           pedidoColumnas: document.getElementById('pedidoColumnas')?.value || '3',
+          pedidoTamano: document.getElementById('pedidoTamano')?.value || 'grande',
           pedidoCopias: document.getElementById('pedidoCopias')?.value || '1',
           origenTipo: document.getElementById('origenTipo')?.value || '',
           prodSelect: document.getElementById('prodSelect')?.value || '',
@@ -479,6 +488,7 @@
       setVal('etqCopias', f.etqCopias);
       setVal('pedidoTexto', f.pedidoTexto);
       setVal('pedidoColumnas', f.pedidoColumnas || '3');
+      setVal('pedidoTamano', f.pedidoTamano || 'grande');
       setVal('pedidoCopias', f.pedidoCopias || '1');
       setVal('origenTipo', f.origenTipo);
 
@@ -535,6 +545,7 @@
       document.getElementById('etqCopias').value = 1;
       document.getElementById('pedidoTexto').value = '';
       document.getElementById('pedidoColumnas').value = '3';
+      document.getElementById('pedidoTamano').value = 'grande';
       document.getElementById('pedidoCopias').value = 1;
       document.getElementById('pedidoPreview').style.display = 'none';
       document.getElementById('pedidoPreview').innerHTML = '';
@@ -838,14 +849,38 @@
       return pedidos.filter(p => p.cliente && p.items.length > 0);
     }
 
-    function buildPedidoGridHtml(pedidos, columnas){
+
+    function getPedidoFontSizes(cols, tamano){
+      const t = tamano || 'grande';
+      const tabla = {
+        normal: {
+          2: { cliente:'16px', items:'15px', previewCliente:'24px', previewItems:'20px' },
+          3: { cliente:'14px', items:'13px', previewCliente:'22px', previewItems:'19px' },
+          4: { cliente:'12px', items:'11px', previewCliente:'20px', previewItems:'17px' }
+        },
+        grande: {
+          2: { cliente:'19px', items:'17px', previewCliente:'30px', previewItems:'25px' },
+          3: { cliente:'17px', items:'15px', previewCliente:'28px', previewItems:'23px' },
+          4: { cliente:'14px', items:'13px', previewCliente:'24px', previewItems:'20px' }
+        },
+        extra: {
+          2: { cliente:'23px', items:'20px', previewCliente:'34px', previewItems:'29px' },
+          3: { cliente:'20px', items:'18px', previewCliente:'32px', previewItems:'27px' },
+          4: { cliente:'16px', items:'15px', previewCliente:'28px', previewItems:'23px' }
+        }
+      };
+      return (tabla[t] && tabla[t][cols]) || tabla.grande[cols] || tabla.grande[3];
+    }
+
+    function buildPedidoGridHtml(pedidos, columnas, tamano = 'grande'){
       const cols = Math.min(4, Math.max(1, parseInt(columnas || 3, 10)));
+      const sizes = getPedidoFontSizes(cols, tamano);
       let html = `<div class="pedido-grid" style="grid-template-columns:repeat(${cols}, minmax(0, 1fr));">`;
       pedidos.forEach(p => {
         html += `
           <div class="pedido-card">
-            <div class="cliente">${escapeHtml(p.cliente)}</div>
-            <div class="items">${p.items.map(escapeHtml).join('<br>')}</div>
+            <div class="cliente" style="font-size:${sizes.previewCliente};">${escapeHtml(p.cliente)}</div>
+            <div class="items" style="font-size:${sizes.previewItems};">${p.items.map(escapeHtml).join('<br>')}</div>
           </div>`;
       });
       html += `</div>`;
@@ -855,20 +890,22 @@
     function previsualizarPedidos(){
       const texto = (document.getElementById('pedidoTexto').value || '').trim();
       const columnas = document.getElementById('pedidoColumnas').value || '3';
+      const tamano = document.getElementById('pedidoTamano').value || 'grande';
       if(!texto) return alert('Pega el texto del pedido.');
 
       const pedidos = parsePedidosTexto(texto);
       if(pedidos.length === 0) return alert('No detecté pedidos. Revisa que cada cliente tenga su nombre y debajo sus productos.');
 
       const box = document.getElementById('pedidoPreview');
-      box.innerHTML = buildPedidoGridHtml(pedidos, columnas);
+      box.innerHTML = buildPedidoGridHtml(pedidos, columnas, tamano);
       box.style.display = 'block';
       vdcDraftSave();
       return pedidos;
     }
 
-    function buildPedidos80mmHtml(pedidos, columnas){
+    function buildPedidos80mmHtml(pedidos, columnas, tamano = 'grande'){
       const cols = Math.min(4, Math.max(1, parseInt(columnas || 3, 10)));
+      const sizes = getPedidoFontSizes(cols, tamano);
       const fecha = fechaMX();
       const cards = pedidos.map(p => `
         <div class="pedido-card">
@@ -888,9 +925,9 @@
   .head{text-align:center;font-weight:900;font-size:12px;margin-bottom:2mm;line-height:1.15;}
   .fecha{font-size:10px;font-weight:700;}
   .pedido-grid{display:grid;grid-template-columns:repeat(${cols}, 1fr);gap:1.5mm;align-items:stretch;}
-  .pedido-card{border:1.5px solid #000;border-radius:2mm;padding:1.5mm;min-height:34mm;page-break-inside:avoid;break-inside:avoid;}
-  .cliente{text-align:center;font-size:${cols >= 4 ? '10px' : '12px'};font-weight:900;border-bottom:1.5px solid #000;padding-bottom:1mm;margin-bottom:1mm;text-transform:uppercase;line-height:1.1;}
-  .items{text-align:center;font-size:${cols >= 4 ? '10px' : '12px'};font-weight:900;line-height:1.25;}
+  .pedido-card{border:1.5px solid #000;border-radius:2mm;padding:1.5mm;min-height:38mm;page-break-inside:avoid;break-inside:avoid;}
+  .cliente{text-align:center;font-size:${sizes.cliente};font-weight:900;border-bottom:1.5px solid #000;padding-bottom:1mm;margin-bottom:1mm;text-transform:uppercase;line-height:1.1;}
+  .items{text-align:center;font-size:${sizes.items};font-weight:900;line-height:1.25;}
   @media print{
     @page{ size:80mm auto; margin:0; }
     body{margin:0;}
@@ -910,14 +947,15 @@
     function imprimirPedidos80mm(){
       const texto = (document.getElementById('pedidoTexto').value || '').trim();
       const columnas = document.getElementById('pedidoColumnas').value || '3';
+      const tamano = document.getElementById('pedidoTamano').value || 'grande';
       const copias = Math.max(1, parseInt(document.getElementById('pedidoCopias').value || '1', 10));
       if(!texto) return alert('Pega el texto del pedido.');
 
       const pedidos = parsePedidosTexto(texto);
       if(pedidos.length === 0) return alert('No detecté pedidos. Revisa que cada cliente tenga su nombre y debajo sus productos.');
 
-      const html = buildPedidos80mmHtml(pedidos, columnas);
-      document.getElementById('pedidoPreview').innerHTML = buildPedidoGridHtml(pedidos, columnas);
+      const html = buildPedidos80mmHtml(pedidos, columnas, tamano);
+      document.getElementById('pedidoPreview').innerHTML = buildPedidoGridHtml(pedidos, columnas, tamano);
       document.getElementById('pedidoPreview').style.display = 'block';
 
       if(USAR_IMPRESION_SILENCIOSA){
@@ -931,6 +969,7 @@
     function limpiarPedidos(){
       document.getElementById('pedidoTexto').value = '';
       document.getElementById('pedidoColumnas').value = '3';
+      document.getElementById('pedidoTamano').value = 'grande';
       document.getElementById('pedidoCopias').value = 1;
       document.getElementById('pedidoPreview').style.display = 'none';
       document.getElementById('pedidoPreview').innerHTML = '';
